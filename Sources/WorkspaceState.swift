@@ -2,7 +2,7 @@ import CoreGraphics
 
 package enum WorkspaceBounds {
     package static let minimumCount = 1
-    package static let maximumCount = 9
+    package static let maximumCount = 10
 
     package static func isValidCount(_ count: Int) -> Bool {
         count >= minimumCount && count <= maximumCount

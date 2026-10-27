@@ -176,6 +176,14 @@ package enum HotkeyPlanner {
             add(key: key, shift: true, action: .moveWorkspace(index))
         }
 
+        if config.workspaceLetterKeys {
+            for index in 0..<min(workspaceCount, Key.letterKeys.count) {
+                let key = Key.letterKeys[index]
+                add(key: key, shift: false, action: .switchWorkspace(index))
+                add(key: key, shift: true, action: .moveWorkspace(index))
+            }
+        }
+
         let bindings = config.bindings
         add(key: bindings.focusNext.key, shift: bindings.focusNext.shift, action: .focusNext)
         add(key: bindings.focusPrev.key, shift: bindings.focusPrev.shift, action: .focusPrev)

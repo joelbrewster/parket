@@ -53,17 +53,23 @@ struct ConfigTests {
         #expect(config.bindings.focusNext.key == Key.j)
     }
 
-    @Test func workspaceCountBoundsStayWithinOneThroughNine() throws {
-        for count in 1...9 {
+    @Test func workspaceCountBoundsStayWithinOneThroughTen() throws {
+        for count in 1...10 {
             let config = try #require(Config.parse("workspace_count = \(count)"))
             #expect(config.workspaceCount == count)
             #expect(config.numberKeys.count == count)
         }
 
         let tooSmall = try #require(Config.parse("workspace_count = 0"))
-        let tooLarge = try #require(Config.parse("workspace_count = 10"))
-        #expect(tooSmall.workspaceCount == 9)
-        #expect(tooLarge.workspaceCount == 9)
+        let tooLarge = try #require(Config.parse("workspace_count = 11"))
+        #expect(tooSmall.workspaceCount == 10)
+        #expect(tooLarge.workspaceCount == 10)
+    }
+
+    @Test func workspaceLetterKeysDefaultOffAndParse() throws {
+        #expect(!Config().workspaceLetterKeys)
+        let config = try #require(Config.parse("workspace_letter_keys = true"))
+        #expect(config.workspaceLetterKeys)
     }
 
     @Test func unknownKeysDoNotCrashOrCorruptDefaults() throws {

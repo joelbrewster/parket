@@ -5,11 +5,11 @@ import Testing
 
 @Suite("Workspace state")
 struct WorkspaceStateTests {
-    @Test func workspaceCountIsClampedToOneThroughNine() {
+    @Test func workspaceCountIsClampedToOneThroughTen() {
         #expect(WorkspaceBounds.clampedCount(-4) == 1)
         #expect(WorkspaceBounds.clampedCount(0) == 1)
         #expect(WorkspaceBounds.clampedCount(4) == 4)
-        #expect(WorkspaceBounds.clampedCount(14) == 9)
+        #expect(WorkspaceBounds.clampedCount(14) == 10)
     }
 
     @Test func switchToTracksPreviousWorkspace() {

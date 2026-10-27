@@ -50,6 +50,45 @@ struct HotkeyPlannerTests {
         #expect(!labels.contains("move_workspace_4"))
     }
 
+    @Test func zeroKeyBindsTenthWorkspace() {
+        var config = Config()
+        config.customBindings = []
+
+        let plan = HotkeyPlanner.plan(config: config)
+
+        #expect(plan.registrations.contains { $0.chord.key == Key.zero && $0.action == .switchWorkspace(9) })
+        #expect(
+            plan.registrations.contains { $0.chord.key == Key.zero && $0.chord.shift && $0.action == .moveWorkspace(9) }
+        )
+    }
+
+    @Test func letterKeysAliasNumberRowWhenEnabled() {
+        var config = Config()
+        config.customBindings = []
+
+        let off = HotkeyPlanner.plan(config: config)
+        #expect(!off.registrations.contains { $0.chord.key == Key.q })
+
+        config.workspaceLetterKeys = true
+        let on = HotkeyPlanner.plan(config: config)
+        #expect(on.registrations.contains { $0.chord.key == Key.q && $0.action == .switchWorkspace(0) })
+        #expect(on.registrations.contains { $0.chord.key == Key.p && $0.action == .switchWorkspace(9) })
+        #expect(on.registrations.contains { $0.chord.key == Key.p && $0.chord.shift && $0.action == .moveWorkspace(9) })
+        #expect(on.skipped.isEmpty)
+    }
+
+    @Test func letterKeysRespectWorkspaceCount() {
+        var config = Config()
+        config.workspaceCount = 3
+        config.workspaceLetterKeys = true
+        config.customBindings = []
+
+        let plan = HotkeyPlanner.plan(config: config)
+
+        #expect(plan.registrations.contains { $0.chord.key == Key.e })
+        #expect(!plan.registrations.contains { $0.chord.key == Key.r })
+    }
+
     @Test func commandTabIsReservedForSystem() {
         var config = Config()
         config.modifier = .command

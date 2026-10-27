@@ -115,7 +115,12 @@ package enum Key {
 
     static let numberKeys: [UInt16] = [
         Key.one, Key.two, Key.three, Key.four, Key.five,
-        Key.six, Key.seven, Key.eight, Key.nine,
+        Key.six, Key.seven, Key.eight, Key.nine, Key.zero,
+    ]
+
+    static let letterKeys: [UInt16] = [
+        Key.q, Key.w, Key.e, Key.r, Key.t,
+        Key.y, Key.u, Key.i, Key.o, Key.p,
     ]
 
     static func name(for code: UInt16) -> String {
@@ -136,7 +141,7 @@ package struct BuiltinBindings {
 }
 
 package struct Config {
-    package static let defaultWorkspaceCount = 9
+    package static let defaultWorkspaceCount = 10
     package static let defaultMasterRatio: CGFloat = 0.55
     @MainActor
     package static var shared = Config()
@@ -150,6 +155,7 @@ package struct Config {
     package var workspaceCount: Int = defaultWorkspaceCount
     package var masterRatio: CGFloat = defaultMasterRatio
     package var modifier: HotkeyModifier = .option
+    package var workspaceLetterKeys = false
     package var customBindings: [Binding] = [
         Binding(key: Key.return, shift: true, command: "open -n -a Terminal")
     ]
@@ -196,6 +202,10 @@ package struct Config {
 
         if let ratio = toml["master_ratio"] as? Double, ratio > 0, ratio < 1 {
             config.masterRatio = CGFloat(ratio)
+        }
+
+        if let letterKeys = toml["workspace_letter_keys"] as? Bool {
+            config.workspaceLetterKeys = letterKeys
         }
 
         if let mod = toml["modifier"] as? String {
@@ -273,9 +283,10 @@ package struct Config {
 
     private static var defaultConfigText: String {
         """
-        workspace_count = 9
+        workspace_count = 10
         master_ratio = 0.55
         modifier = "option"
+        workspace_letter_keys = false
 
         [bindings]
         focus_next = "j"

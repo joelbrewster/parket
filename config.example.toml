@@ -1,8 +1,12 @@
 # parket configuration
 # copy to ~/.config/parket/config.toml
 
-# number of workspaces (1-9)
-# workspace_count = 9
+# number of workspaces (1-10, bound to 1-9 then 0)
+# workspace_count = 10
+
+# also bind q-p to workspaces 1-10 (q=1 ... p=10)
+# note: takes over modifier+q..p, so option+e/u/i dead keys stop typing accents
+# workspace_letter_keys = false
 
 # master window width ratio (0.0-1.0)
 # master_ratio = 0.55

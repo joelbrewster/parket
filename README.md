@@ -37,8 +37,8 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 
 | Key | Action |
 |-----|--------|
-| `Option + 1-9` | Switch workspace |
-| `Option + Shift + 1-9` | Move focused window to workspace |
+| `Option + 1-9, 0` | Switch workspace |
+| `Option + Shift + 1-9, 0` | Move focused window to workspace |
 | `Option + J/K` | Focus next or previous window |
 | `Option + Return` | Swap focused window with master |
 | `Option + Tab` | Switch to last active workspace |
@@ -52,7 +52,7 @@ Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Open Conf
 
 ## Model
 
-- 9 workspaces per display.
+- 10 workspaces per display.
 - Master-stack and monocle layouts.
 - One native tab group counts as one tileable window.
 - Panels, dialogs, minimized windows, fullscreen windows, and dead AX elements stay out of workspace state.
@@ -63,9 +63,10 @@ Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Open Conf
 Edit `~/.config/parket/config.toml`. All fields are optional.
 
 ```toml
-workspace_count = 9
+workspace_count = 10
 master_ratio = 0.55
 modifier = "option"
+workspace_letter_keys = false  # true also binds q-p to workspaces 1-10
 
 [bindings]
 focus_next = "j"
