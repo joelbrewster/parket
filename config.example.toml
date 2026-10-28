@@ -8,6 +8,9 @@
 # note: takes over modifier+q..p, so option+e/u/i dead keys stop typing accents
 # workspace_letter_keys = false
 
+# focus the window under the mouse pointer when the pointer moves onto it
+# focus_follows_mouse = false
+
 # master window width ratio (0.0-1.0)
 # master_ratio = 0.55
 

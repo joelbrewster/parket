@@ -56,6 +56,7 @@ package final class ParketRuntime {
             "tiling: \(ws.isTilingPaused ? "paused" : "enabled")",
             "config_path: \(Config.path)",
             "workspace_count: \(Config.shared.workspaceCount)",
+            "focus_follows_mouse: \(Config.shared.focusFollowsMouse)",
             "monitor_count: \(ws.monitors.count)",
             "ax_messaging_timeout_seconds: \(WindowManager.messagingTimeoutSeconds)",
         ])
@@ -113,6 +114,7 @@ package final class ParketRuntime {
         if isRunning {
             WorkspaceManager.shared.applyCurrentConfig()
             Hotkeys.shared.reload()
+            MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
         }
         StatusBar.shared.update()
         fputs("parket: config reloaded\n", stderr)
@@ -129,12 +131,14 @@ package final class ParketRuntime {
         WindowObserver.shared.start()
         registerScreenObserver()
         Hotkeys.shared.start()
+        MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
         isRunning = true
         fputs("parket: running\n", stderr)
     }
 
     private func enterWaitingState() {
         Hotkeys.shared.stop()
+        MouseFocus.shared.stop()
         isRunning = false
     }
 

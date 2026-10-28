@@ -66,6 +66,12 @@ struct ConfigTests {
         #expect(tooLarge.workspaceCount == 10)
     }
 
+    @Test func focusFollowsMouseDefaultOffAndParse() throws {
+        #expect(!Config().focusFollowsMouse)
+        let config = try #require(Config.parse("focus_follows_mouse = true"))
+        #expect(config.focusFollowsMouse)
+    }
+
     @Test func workspaceLetterKeysDefaultOffAndParse() throws {
         #expect(!Config().workspaceLetterKeys)
         let config = try #require(Config.parse("workspace_letter_keys = true"))

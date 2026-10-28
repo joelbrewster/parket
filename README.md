@@ -29,8 +29,7 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 
 ## Requirements
 
-- macOS 14+
-- Apple Silicon
+- macOS 13+
 - Accessibility permission
 
 ## Keys
@@ -67,6 +66,7 @@ workspace_count = 10
 master_ratio = 0.55
 modifier = "option"
 workspace_letter_keys = false  # true also binds q-p to workspaces 1-10
+focus_follows_mouse = false    # true focuses the window the pointer moves onto
 
 [bindings]
 focus_next = "j"

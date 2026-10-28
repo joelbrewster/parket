@@ -156,6 +156,7 @@ package struct Config {
     package var masterRatio: CGFloat = defaultMasterRatio
     package var modifier: HotkeyModifier = .option
     package var workspaceLetterKeys = false
+    package var focusFollowsMouse = false
     package var customBindings: [Binding] = [
         Binding(key: Key.return, shift: true, command: "open -n -a Terminal")
     ]
@@ -206,6 +207,10 @@ package struct Config {
 
         if let letterKeys = toml["workspace_letter_keys"] as? Bool {
             config.workspaceLetterKeys = letterKeys
+        }
+
+        if let followsMouse = toml["focus_follows_mouse"] as? Bool {
+            config.focusFollowsMouse = followsMouse
         }
 
         if let mod = toml["modifier"] as? String {
@@ -287,6 +292,7 @@ package struct Config {
         master_ratio = 0.55
         modifier = "option"
         workspace_letter_keys = false
+        focus_follows_mouse = false
 
         [bindings]
         focus_next = "j"

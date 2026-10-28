@@ -1,0 +1,68 @@
+import AppKit
+
+@MainActor
+package final class MouseFocus {
+    package static let shared = MouseFocus()
+
+    private static let settleDelay: TimeInterval = 0.05
+
+    private var eventMonitor: Any?
+    private var pendingCheck: DispatchWorkItem?
+    private var lastHovered: TrackedWindow?
+
+    private init() {}
+
+    package func apply(enabled: Bool) {
+        if enabled {
+            start()
+        } else {
+            stop()
+        }
+    }
+
+    package func stop() {
+        if let eventMonitor {
+            NSEvent.removeMonitor(eventMonitor)
+        }
+        eventMonitor = nil
+        pendingCheck?.cancel()
+        pendingCheck = nil
+        lastHovered = nil
+    }
+
+    private func start() {
+        guard eventMonitor == nil else { return }
+        eventMonitor = NSEvent.addGlobalMonitorForEvents(matching: .mouseMoved) { _ in
+            MainActor.assumeIsolated {
+                MouseFocus.shared.scheduleCheck()
+            }
+        }
+    }
+
+    private func scheduleCheck() {
+        pendingCheck?.cancel()
+        let work = DispatchWorkItem {
+            MainActor.assumeIsolated {
+                MouseFocus.shared.pendingCheck = nil
+                MouseFocus.shared.focusWindowUnderPointer()
+            }
+        }
+        pendingCheck = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settleDelay, execute: work)
+    }
+
+    private func focusWindowUnderPointer() {
+        guard NSEvent.pressedMouseButtons == 0, let point = CGEvent(source: nil)?.location else { return }
+        guard let tile = WorkspaceManager.shared.tiledWindow(at: point) else {
+            lastHovered = nil
+            return
+        }
+        guard tile != lastHovered else { return }
+        lastHovered = tile
+        guard let top = WindowManager.topWindow(at: point),
+            let target = WorkspaceManager.shared.visibleWindow(pid: top.pid, element: top.element),
+            WindowManager.focusedWindow() != target
+        else { return }
+        target.focus()
+    }
+}

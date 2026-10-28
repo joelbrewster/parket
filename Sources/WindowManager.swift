@@ -412,6 +412,25 @@ enum WindowManager {
         return trackedWindow(appRef, kAXFocusedWindowAttribute as CFString, pid: pid)
     }
 
+    static func topWindow(at point: CGPoint) -> (pid: pid_t, element: AXUIElement)? {
+        var hit: AXUIElement?
+        let systemWide = AXUIElementCreateSystemWide()
+        guard AXUIElementCopyElementAtPosition(systemWide, Float(point.x), Float(point.y), &hit) == .success,
+            let hit
+        else { return nil }
+        var pid: pid_t = 0
+        guard AXUIElementGetPid(hit, &pid) == .success else { return nil }
+        var value: AnyObject?
+        var top = hit
+        if copyAttributeValue(hit, kAXWindowAttribute as CFString, &value) == .success,
+            let value,
+            CFGetTypeID(value) == AXUIElementGetTypeID()
+        {
+            top = value as! AXUIElement
+        }
+        return (pid, canonicalWindowElement(top) ?? top)
+    }
+
     static func isFrontmostApplication(pid: pid_t) -> Bool {
         NSWorkspace.shared.frontmostApplication?.processIdentifier == pid
     }

@@ -496,6 +496,23 @@ package final class WorkspaceManager {
         }
     }
 
+    func tiledWindow(at point: CGPoint) -> TrackedWindow? {
+        guard !isTilingPaused else { return nil }
+        return monitors.lazy.compactMap { $0.tiledWindow(at: point) }.first
+    }
+
+    func visibleWindow(pid: pid_t, element: AXUIElement) -> TrackedWindow? {
+        guard !isTilingPaused else { return nil }
+        for monitor in monitors where monitor.workspaces.indices.contains(monitor.active) {
+            if let window = monitor.workspaces[monitor.active].first(where: {
+                $0.pid == pid && $0.containsElement(element)
+            }) {
+                return window
+            }
+        }
+        return nil
+    }
+
     package func applyCurrentConfig() {
         let count = Config.shared.workspaceCount
         for monitor in monitors {

@@ -125,6 +125,21 @@ package final class Monitor {
         return moved
     }
 
+    func tiledWindow(at point: CGPoint) -> TrackedWindow? {
+        guard tileFrame.contains(point), workspaces.indices.contains(active) else { return nil }
+        let windows = workspaces[active]
+        if layouts[active] == .monocle {
+            return windows.indices.contains(focusedIndices[active]) ? windows[focusedIndices[active]] : windows.first
+        }
+        let frames = Tiler.calculateFrames(
+            count: windows.count,
+            screen: tileFrame,
+            layout: layouts[active],
+            masterRatio: Config.shared.masterRatio
+        )
+        return zip(windows, frames).first { $0.1.contains(point) }?.0
+    }
+
     @discardableResult
     func insertWindow(_ window: TrackedWindow) -> Bool {
         guard updateExistingWindow(window) == .missing else { return false }
