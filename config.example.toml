@@ -20,6 +20,11 @@
 # bar typeface: "menubar" (macOS menu bar) or "mono" (Yakshaven)
 # bar_font = "menubar"
 
+# selected window title: "fill", "outline", or "text" (accent-coloured text, no box)
+# bar_highlight = "fill"
+# workspace numbers; omit to follow bar_highlight
+# bar_tag_highlight = "text"
+
 # master window width ratio (0.0-1.0)
 # master_ratio = 0.55
 

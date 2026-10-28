@@ -295,24 +295,25 @@ private final class BarContentView: NSView {
         var x: CGFloat = margin
         hits = []
 
+        let tagStyle = Config.shared.barTagHighlight
         let tagSide = contentHeight
         let markSide: CGFloat = 5
         for (index, tag) in tags.enumerated() {
             let rect = NSRect(x: x, y: topPad, width: tagSide, height: tagSide)
-            if tag.active {
-                fillAccent(rect.insetBy(dx: 0, dy: margin))
+            if tag.active, titleHighlighted, tagStyle != .text {
+                paintAccent(rect.insetBy(dx: 0, dy: margin), style: tagStyle)
             }
             drawText(
                 "\(tag.number)",
                 in: rect,
                 font: font,
-                color: tag.active ? .white : (tag.occupied ? .labelColor : .tertiaryLabelColor),
+                color: tagColor(tag, style: tagStyle, focused: titleHighlighted),
                 textY: textY,
                 textHeight: textHeight
             )
-            if tag.occupied && !tag.active {
+            if tag.occupied {
                 let mark = NSRect(x: rect.minX + 3, y: topPad + 3, width: markSide, height: markSide)
-                NSColor.labelColor.setFill()
+                tagColor(tag, style: tagStyle, focused: titleHighlighted).setFill()
                 mark.fill()
             }
             hits.append((.tag(index), rect))
@@ -349,14 +350,15 @@ private final class BarContentView: NSView {
             width: max(0, titleSlot - titleMargin * 2),
             height: contentHeight
         )
-        if titleHighlighted && !titleText.isEmpty {
-            fillAccent(titleRect.insetBy(dx: 0, dy: margin))
+        let titleStyle = tagStyle == .text ? .text : Config.shared.barHighlight
+        if titleHighlighted && !titleText.isEmpty, titleStyle != .text {
+            paintAccent(titleRect.insetBy(dx: 0, dy: margin), style: titleStyle)
         }
         drawText(
             titleText,
             in: titleRect,
             font: font,
-            color: titleHighlighted && !titleText.isEmpty ? .white : .labelColor,
+            color: titleColor(highlighted: titleHighlighted && !titleText.isEmpty, style: titleStyle),
             truncate: true,
             padding: titlePadding,
             textY: textY,
@@ -383,14 +385,48 @@ private final class BarContentView: NSView {
         StatusBar.shared.popUpMenu(with: event, in: self)
     }
 
-    private func fillAccent(_ rect: NSRect) {
+    private func tagColor(_ tag: BarTag, style: BarHighlight, focused: Bool) -> NSColor {
+        guard tag.active, focused else {
+            return tag.occupied ? .labelColor : .tertiaryLabelColor
+        }
+        switch style {
+        case .fill: return .white
+        case .outline: return .labelColor
+        case .text: return MenuBarChrome.accent
+        }
+    }
+
+    private func titleColor(highlighted: Bool, style: BarHighlight) -> NSColor {
+        guard highlighted else { return .labelColor }
+        switch style {
+        case .fill: return .white
+        case .outline: return .labelColor
+        case .text: return MenuBarChrome.accent
+        }
+    }
+
+    private func paintAccent(_ rect: NSRect, style: BarHighlight) {
+        let width = Config.shared.borderWidth
+        let inner = style == .outline
+            ? rect.insetBy(dx: width / 2, dy: width / 2)
+            : rect
         let radius = min(
             Config.shared.borderRadius,
-            max(0, rect.width / 2),
-            max(0, rect.height / 2)
+            max(0, inner.width / 2),
+            max(0, inner.height / 2)
         )
-        MenuBarChrome.accent.setFill()
-        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
+        let path = NSBezierPath(roundedRect: inner, xRadius: radius, yRadius: radius)
+        switch style {
+        case .fill:
+            MenuBarChrome.accent.setFill()
+            path.fill()
+        case .outline:
+            MenuBarChrome.accent.setStroke()
+            path.lineWidth = width
+            path.stroke()
+        case .text:
+            break
+        }
     }
 
     private func cellWidth(_ text: String, font: NSFont) -> CGFloat {

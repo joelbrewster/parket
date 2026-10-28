@@ -82,6 +82,19 @@ struct ConfigTests {
         #expect(!hidden.menuBarIcon)
     }
 
+    @Test func barHighlightDefaultsFillAndParsesOutline() throws {
+        #expect(Config().barHighlight == .fill)
+        #expect(Config().barTagHighlight == .fill)
+        let outline = try #require(Config.parse("bar_highlight = \"outline\""))
+        #expect(outline.barHighlight == .outline)
+        #expect(outline.barTagHighlight == .outline)
+        let alias = try #require(Config.parse("bar_highlight = \"border\""))
+        #expect(alias.barHighlight == .outline)
+        let text = try #require(Config.parse("bar_highlight = \"outline\"\nbar_tag_highlight = \"text\""))
+        #expect(text.barHighlight == .outline)
+        #expect(text.barTagHighlight == .text)
+    }
+
     @Test func barFontDefaultsMenubarAndParsesMono() throws {
         #expect(Config().barFont == .menubar)
         let mono = try #require(Config.parse("bar_font = \"mono\""))

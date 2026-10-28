@@ -6,6 +6,12 @@ package enum HotkeyModifier: String, Equatable {
     case command
 }
 
+package enum BarHighlight: String, Equatable {
+    case fill
+    case outline
+    case text
+}
+
 package enum BarFont: String, Equatable {
     case menubar
     case mono
@@ -204,6 +210,8 @@ package struct Config {
     package var bar = true
     package var menuBarIcon = true
     package var barFont: BarFont = .menubar
+    package var barHighlight: BarHighlight = .fill
+    package var barTagHighlight: BarHighlight = .fill
     package var barGap: CGFloat = 0
     package var borderWidth: CGFloat = 2
     package var borderRadius: CGFloat = 8
@@ -301,6 +309,23 @@ package struct Config {
                 config.barFont = .mono
             default:
                 report("unknown bar_font '\(font)', using menubar")
+            }
+        }
+
+        if let highlight = toml["bar_highlight"] as? String {
+            if let value = parseHighlight(highlight) {
+                config.barHighlight = value
+                config.barTagHighlight = value
+            } else {
+                report("unknown bar_highlight '\(highlight)', using fill")
+            }
+        }
+
+        if let highlight = toml["bar_tag_highlight"] as? String {
+            if let value = parseHighlight(highlight) {
+                config.barTagHighlight = value
+            } else {
+                report("unknown bar_tag_highlight '\(highlight)', using \(config.barTagHighlight.rawValue)")
             }
         }
 
@@ -521,6 +546,19 @@ package struct Config {
         return nil
     }
 
+    private static func parseHighlight(_ value: String) -> BarHighlight? {
+        switch value {
+        case "fill", "solid":
+            return .fill
+        case "outline", "border", "stroke":
+            return .outline
+        case "text", "color", "accent":
+            return .text
+        default:
+            return nil
+        }
+    }
+
     private static func parseKeyString(_ s: String) -> (key: UInt16?, shift: Bool) {
         if s.hasPrefix("shift+") {
             let name = String(s.dropFirst(6))
@@ -553,6 +591,8 @@ package struct Config {
         bar = true
         menu_bar_icon = true
         bar_font = "menubar"
+        bar_highlight = "fill"
+        bar_tag_highlight = "fill"
         bar_gap = 0
         border_width = 2
         border_radius = 8
