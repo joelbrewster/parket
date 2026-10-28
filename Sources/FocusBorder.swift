@@ -32,6 +32,11 @@ package final class FocusBorder {
         border.orderFrontRegardless()
     }
 
+    package func applyAppearance() {
+        panel?.appearance = MenuBarChrome.appearance
+        panel?.contentView?.needsDisplay = true
+    }
+
     private func targetFrame() -> CGRect? {
         let ws = WorkspaceManager.shared
         guard !ws.isTilingPaused, !ws.monitors.isEmpty else { return nil }

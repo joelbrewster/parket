@@ -81,6 +81,16 @@ package final class Bar {
         update()
     }
 
+    package func applyAppearance() {
+        let appearance = MenuBarChrome.appearance
+        let color = MenuBarChrome.color
+        for panel in panels.values {
+            panel.appearance = appearance
+            panel.backgroundColor = color
+            panel.barView.needsDisplay = true
+        }
+    }
+
     package func update() {
         let clock = statusText()
         let ws = WorkspaceManager.shared

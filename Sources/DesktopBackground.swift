@@ -1,12 +1,18 @@
 import AppKit
 
 enum MenuBarChrome {
+    static var isDark: Bool {
+        UserDefaults.standard.string(forKey: "AppleInterfaceStyle") == "Dark"
+    }
+
+    static var appearance: NSAppearance {
+        NSAppearance(named: isDark ? .darkAqua : .aqua)!
+    }
+
     static var color: NSColor {
-        NSColor(name: "parket.menuBarFill") { appearance in
-            appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
-                ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.118, alpha: 1)
-                : NSColor(srgbRed: 0.965, green: 0.965, blue: 0.965, alpha: 1)
-        }
+        isDark
+            ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.118, alpha: 1)
+            : NSColor(srgbRed: 0.965, green: 0.965, blue: 0.965, alpha: 1)
     }
 }
 
@@ -14,19 +20,27 @@ enum MenuBarChrome {
 package final class DesktopBackground {
     package static let shared = DesktopBackground()
 
-    private var appearanceObserver: NSObjectProtocol?
+    private var appearanceObservation: NSKeyValueObservation?
+    private var themeObserver: NSObjectProtocol?
     private var screenObserver: NSObjectProtocol?
 
     private init() {}
 
     package func start() {
-        if appearanceObserver == nil {
-            appearanceObserver = DistributedNotificationCenter.default.addObserver(
+        if appearanceObservation == nil {
+            appearanceObservation = NSApp.observe(\.effectiveAppearance, options: [.new]) { _, _ in
+                DispatchQueue.main.async {
+                    DesktopBackground.shared.apply()
+                }
+            }
+        }
+        if themeObserver == nil {
+            themeObserver = DistributedNotificationCenter.default.addObserver(
                 forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
                 object: nil,
                 queue: .main
             ) { _ in
-                MainActor.assumeIsolated {
+                DispatchQueue.main.async {
                     DesktopBackground.shared.apply()
                 }
             }
@@ -46,11 +60,18 @@ package final class DesktopBackground {
     }
 
     private func apply() {
-        let color = MenuBarChrome.color
-        guard let url = writeImage(color) else { return }
+        let appearance = MenuBarChrome.appearance
+        let current = NSApp.effectiveAppearance.bestMatch(from: [.darkAqua, .aqua])
+        let next = appearance.bestMatch(from: [.darkAqua, .aqua])
+        if current != next {
+            NSApp.appearance = appearance
+        }
+        Bar.shared.applyAppearance()
+        FocusBorder.shared.applyAppearance()
+        guard let url = writeImage(MenuBarChrome.color) else { return }
         let options: [NSWorkspace.DesktopImageOptionKey: Any] = [
             .allowClipping: true,
-            .fillColor: color,
+            .fillColor: MenuBarChrome.color,
         ]
         for screen in NSScreen.screens {
             try? NSWorkspace.shared.setDesktopImageURL(url, for: screen, options: options)
@@ -60,7 +81,7 @@ package final class DesktopBackground {
     private func writeImage(_ color: NSColor) -> URL? {
         let directory = Config.url.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        let url = directory.appendingPathComponent("desktop.png")
+        let url = directory.appendingPathComponent(MenuBarChrome.isDark ? "desktop-dark.png" : "desktop-light.png")
         let size = 8
         guard
             let rep = NSBitmapImageRep(
@@ -78,7 +99,7 @@ package final class DesktopBackground {
         else { return nil }
         NSGraphicsContext.saveGraphicsState()
         NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-        (color.usingColorSpace(.deviceRGB) ?? color).setFill()
+        color.setFill()
         NSRect(x: 0, y: 0, width: size, height: size).fill()
         NSGraphicsContext.restoreGraphicsState()
         guard let png = rep.representation(using: .png, properties: [:]) else { return nil }
