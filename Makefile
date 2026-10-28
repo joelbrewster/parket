@@ -1,15 +1,18 @@
 APP_NAME = parket
 BUNDLE = $(APP_NAME).app
 INSTALL_DIR = /Applications/$(BUNDLE)
-BUILD_DIR = .build/release
+BUILD_DIR = .build/apple/Products/Release
 BUNDLE_ID = com.parket.app
 CODESIGN_IDENTITY ?= -
 CODESIGN_REQUIREMENTS ?= =designated => identifier "$(BUNDLE_ID)"
 
-.PHONY: build test fmt lint policy check install clean dist verify-dist notarize fixture-app smoke-local focus-local close-focus-local perf-local latency-local coverage perf benchmark
+SYNC_DIR = $(HOME)/Sync
+SYNC_BUNDLE = $(SYNC_DIR)/$(BUNDLE)
+
+.PHONY: build test fmt lint policy check install clean dist verify-dist notarize fixture-app smoke-local focus-local close-focus-local perf-local latency-local coverage perf benchmark sync
 
 build:
-	swift build --product parket -c release
+	swift build --product parket -c release --arch arm64 --arch x86_64
 
 test:
 	swift test --enable-swift-testing
@@ -45,6 +48,12 @@ dist: build
 	rm -f $(APP_NAME).zip
 	ditto -c -k --sequesterRsrc --keepParent $(BUNDLE) $(APP_NAME).zip
 	@shasum -a 256 $(APP_NAME).zip
+
+sync: dist
+	mkdir -p $(SYNC_DIR)
+	rm -rf $(SYNC_BUNDLE)
+	ditto $(BUNDLE) $(SYNC_BUNDLE)
+	@echo "copied $(SYNC_BUNDLE)"
 
 verify-dist:
 	bash scripts/verify-dist.sh
