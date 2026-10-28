@@ -11,6 +11,10 @@ final class TerminationCoordinator: NSObject, NSApplicationDelegate {
         NSApplication.shared.terminate(nil)
     }
 
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        Bar.shared.start()
+    }
+
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
         WorkspaceManager.shared.restoreAllWindows()
         return .terminateNow

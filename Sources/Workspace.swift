@@ -70,6 +70,12 @@ package final class WorkspaceManager {
         scheduleStatusUpdate()
     }
 
+    func switchTo(_ index: Int, displayID: CGDirectDisplayID) {
+        guard let monitorIndex = monitors.firstIndex(where: { $0.displayID == displayID }) else { return }
+        focusedMonitorIndex = monitorIndex
+        switchTo(index)
+    }
+
     func switchToLast() {
         guard !monitors.isEmpty else { return }
         let target = focusedMonitor.previousActive
@@ -228,6 +234,12 @@ package final class WorkspaceManager {
         guard !monitors.isEmpty else { return }
         focusedMonitor.toggleLayout()
         StatusBar.shared.update()
+    }
+
+    func toggleLayout(displayID: CGDirectDisplayID) {
+        guard let monitorIndex = monitors.firstIndex(where: { $0.displayID == displayID }) else { return }
+        focusedMonitorIndex = monitorIndex
+        toggleLayout()
     }
 
     func focusMonitor(offset: Int) {
@@ -577,7 +589,10 @@ package final class WorkspaceManager {
                 return Monitor(
                     displayID: displayID,
                     screen: screen,
-                    tileFrame: geometry.visibleFrame,
+                    tileFrame: BarLayout.tileFrame(
+                        screenFrame: geometry.frame,
+                        visibleFrame: geometry.visibleFrame
+                    ),
                     offscreenContext: OffscreenWindowPlacementContext(
                         screen: geometry.visibleFrame,
                         visibleScreens: visibleScreens
@@ -595,6 +610,7 @@ package final class WorkspaceManager {
                 }
                 return lhs.displayID < rhs.displayID
             }
+        Bar.shared.sync(screens: screens)
     }
 
     private func primaryDisplayID() -> CGDirectDisplayID {
