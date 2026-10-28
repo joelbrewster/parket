@@ -28,6 +28,6 @@ struct BarLayoutTests {
 
     @Test func reservedTopIsBarPlusTinyGap() {
         #expect(BarLayout.reservedTop == BarLayout.height + BarLayout.gap)
-        #expect(BarLayout.gap == 4)
+        #expect(BarLayout.gap == 0)
     }
 }

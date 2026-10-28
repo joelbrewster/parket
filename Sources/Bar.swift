@@ -1,8 +1,8 @@
 import AppKit
 
 package enum BarLayout {
-    package static let height: CGFloat = 24
-    package static let gap: CGFloat = 4
+    package static let height: CGFloat = 28
+    package static let gap: CGFloat = 0
     package static var reservedTop: CGFloat { height + gap }
 
     package static func windowFrame(for screen: NSScreen) -> CGRect {
@@ -259,9 +259,10 @@ private final class BarContentView: NSView {
         var x: CGFloat = 0
         hits = []
 
+        let tagSide = bounds.height
+        let markSide: CGFloat = 5
         for (index, tag) in tags.enumerated() {
-            let width = cellWidth("\(tag.number)", font: font)
-            let rect = NSRect(x: x, y: 0, width: width, height: bounds.height)
+            let rect = NSRect(x: x, y: 0, width: tagSide, height: tagSide)
             if tag.active {
                 NSColor.controlAccentColor.setFill()
                 rect.fill()
@@ -273,12 +274,12 @@ private final class BarContentView: NSView {
                 color: tag.active ? .white : (tag.occupied ? .labelColor : .tertiaryLabelColor)
             )
             if tag.occupied && !tag.active {
-                let mark = NSRect(x: rect.minX + 3, y: 3, width: 4, height: 4)
+                let mark = NSRect(x: rect.minX + 3, y: 3, width: markSide, height: markSide)
                 NSColor.labelColor.setFill()
                 mark.fill()
             }
             hits.append((.tag(index), rect))
-            x += width
+            x += tagSide
         }
 
         let symbol = layout == .monocle ? "[M]" : "[]="
