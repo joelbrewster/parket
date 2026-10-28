@@ -1,7 +1,8 @@
 import AppKit
 
 package enum FocusBorderLayout {
-    package static let width: CGFloat = 4
+    package static let width: CGFloat = 2
+    package static let innerRadius: CGFloat = 8
 }
 
 @MainActor
@@ -100,12 +101,16 @@ private final class FocusBorderView: NSView {
     override var isOpaque: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        let inset = FocusBorderLayout.width / 2
-        let rect = bounds.insetBy(dx: inset, dy: inset)
-        let path = NSBezierPath(rect: rect)
-        path.lineWidth = FocusBorderLayout.width
-        path.lineJoinStyle = .miter
-        NSColor.controlAccentColor.setStroke()
-        path.stroke()
+        let innerRect = bounds.insetBy(dx: FocusBorderLayout.width, dy: FocusBorderLayout.width)
+        let radius = min(
+            FocusBorderLayout.innerRadius,
+            innerRect.width / 2,
+            innerRect.height / 2
+        )
+        let path = NSBezierPath(rect: bounds)
+        path.append(NSBezierPath(roundedRect: innerRect, xRadius: radius, yRadius: radius))
+        path.windingRule = .evenOdd
+        NSColor.controlAccentColor.setFill()
+        path.fill()
     }
 }
