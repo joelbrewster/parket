@@ -36,7 +36,7 @@ package final class Bar {
     private let clockFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.locale = .current
-        formatter.setLocalizedDateFormatFromTemplate("EEE d MMM HH:mm")
+        formatter.dateFormat = "EEE d MMM h:mm"
         return formatter
     }()
 
@@ -82,6 +82,7 @@ package final class Bar {
     package func update() {
         let clock = clockFormatter.string(from: Date())
         let ws = WorkspaceManager.shared
+        let focusedID = ws.monitors.isEmpty ? nil : ws.focusedMonitor.displayID
         for (id, panel) in panels {
             let monitor = ws.monitors.first { $0.displayID == id }
             panel.barView.update(
@@ -89,6 +90,7 @@ package final class Bar {
                 layout: layout(for: monitor),
                 windowCount: windowCount(for: monitor),
                 title: title(for: monitor),
+                titleHighlighted: monitor?.displayID == focusedID,
                 clock: clock
             )
         }
@@ -227,6 +229,7 @@ private final class BarContentView: NSView {
     private var layout: Layout = .tile
     private var windowCount = 0
     private var titleText = ""
+    private var titleHighlighted = false
     private var clock = ""
     private var hits: [(BarHit, NSRect)] = []
 
@@ -245,11 +248,19 @@ private final class BarContentView: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    func update(tags: [BarTag], layout: Layout, windowCount: Int, title: String, clock: String) {
+    func update(
+        tags: [BarTag],
+        layout: Layout,
+        windowCount: Int,
+        title: String,
+        titleHighlighted: Bool,
+        clock: String
+    ) {
         self.tags = tags
         self.layout = layout
         self.windowCount = windowCount
         titleText = title
+        self.titleHighlighted = titleHighlighted
         self.clock = clock
         needsDisplay = true
     }
@@ -299,17 +310,36 @@ private final class BarContentView: NSView {
             x = countRect.maxX
         }
 
-        let clockWidth = textSize(clock, font: font).width + 16
+        let clockWidth = textSize(clock, font: font).width + 24
         let clockRect = NSRect(
             x: bounds.maxX - clockWidth,
             y: 0,
             width: clockWidth,
             height: bounds.height
         )
-        drawText(clock, in: clockRect, font: font, color: .secondaryLabelColor)
+        drawText(clock, in: clockRect, font: font, color: .secondaryLabelColor, truncate: true)
 
-        let titleRect = NSRect(x: x, y: 0, width: max(0, clockRect.minX - x), height: bounds.height)
-        drawText(titleText, in: titleRect, font: font, color: .labelColor, truncate: true)
+        let titleMargin: CGFloat = 8
+        let titlePadding: CGFloat = 10
+        let titleSlot = max(0, clockRect.minX - x)
+        let accentRect = NSRect(
+            x: x + titleMargin,
+            y: 0,
+            width: max(0, titleSlot - titleMargin * 2),
+            height: bounds.height
+        )
+        if titleHighlighted && !titleText.isEmpty {
+            NSColor.controlAccentColor.setFill()
+            accentRect.fill()
+        }
+        drawText(
+            titleText,
+            in: accentRect,
+            font: font,
+            color: titleHighlighted && !titleText.isEmpty ? .white : .labelColor,
+            truncate: true,
+            padding: titlePadding
+        )
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -339,16 +369,23 @@ private final class BarContentView: NSView {
         NSAttributedString(string: text, attributes: [.font: font]).size()
     }
 
-    private func drawText(_ text: String, in rect: NSRect, font: NSFont, color: NSColor, truncate: Bool = false) {
+    private func drawText(
+        _ text: String,
+        in rect: NSRect,
+        font: NSFont,
+        color: NSColor,
+        truncate: Bool = false,
+        padding: CGFloat = 8
+    ) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = truncate ? .byTruncatingTail : .byClipping
         if truncate { paragraph.alignment = .left }
-        let inset = truncate ? 8 : 0
+        let inset = truncate ? padding : 0
         let drawRect = NSRect(
-            x: rect.minX + CGFloat(inset),
+            x: rect.minX + inset,
             y: rect.minY,
-            width: max(0, rect.width - CGFloat(inset) * (truncate ? 1 : 0)),
+            width: max(0, rect.width - inset * 2),
             height: rect.height
         )
         let attr = NSAttributedString(
