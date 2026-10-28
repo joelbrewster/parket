@@ -27,6 +27,8 @@ struct ConfigTests {
         #expect(config.workspaceCount == 4)
         #expect(config.masterRatio == CGFloat(0.62))
         #expect(config.modifier == .control)
+        let alt = try #require(Config.parse("modifier = \"alt\""))
+        #expect(alt.modifier == .option)
         #expect(config.bindings.focusNext.key == Key.l)
         #expect(config.bindings.moveMonitorPrev.shift)
         #expect(config.customBindings.count == 1)
@@ -86,6 +88,14 @@ struct ConfigTests {
         #expect(mono.barFont == .mono)
         let alias = try #require(Config.parse("bar_font = \"monospace\""))
         #expect(alias.barFont == .mono)
+    }
+
+    @Test func borderWidthAndRadiusParse() throws {
+        #expect(Config().borderWidth == 2)
+        #expect(Config().borderRadius == 8)
+        let config = try #require(Config.parse("border_width = 3\nborder_radius = 8"))
+        #expect(config.borderWidth == 3)
+        #expect(config.borderRadius == 8)
     }
 
     @Test func workspaceLetterKeysDefaultOffAndParse() throws {

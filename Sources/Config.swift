@@ -178,6 +178,7 @@ package struct BuiltinBindings {
     var moveMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, true)
     var moveMonitorNext: (key: UInt16, shift: Bool) = (Key.period, true)
     var lastWorkspace: (key: UInt16, shift: Bool) = (Key.tab, false)
+    var reloadConfig: (key: UInt16, shift: Bool) = (Key.c, true)
 }
 
 package struct Config {
@@ -203,6 +204,8 @@ package struct Config {
     package var bar = true
     package var menuBarIcon = true
     package var barFont: BarFont = .menubar
+    package var borderWidth: CGFloat = 2
+    package var borderRadius: CGFloat = 8
     package var customBindings: [Binding] = []
     package var rules: [AppRule] = []
     package var bindings = BuiltinBindings()
@@ -269,6 +272,14 @@ package struct Config {
             config.focusFollowsMouse = followsMouse
         }
 
+        if let width = cgFloat(toml["border_width"]), width > 0, width <= 32 {
+            config.borderWidth = width
+        }
+
+        if let radius = cgFloat(toml["border_radius"]), radius >= 0, radius <= 64 {
+            config.borderRadius = radius
+        }
+
         if let bar = toml["bar"] as? Bool {
             config.bar = bar
         }
@@ -290,10 +301,14 @@ package struct Config {
 
         if let mod = toml["modifier"] as? String {
             switch mod {
-            case "option": config.modifier = .option
-            case "control": config.modifier = .control
-            case "command": config.modifier = .command
-            default: report("unknown modifier '\(mod)', using option")
+            case "option", "alt", "opt":
+                config.modifier = .option
+            case "control", "ctrl":
+                config.modifier = .control
+            case "command", "cmd":
+                config.modifier = .command
+            default:
+                report("unknown modifier '\(mod)', using option")
             }
         }
 
@@ -312,6 +327,7 @@ package struct Config {
             applyBinding(bindings, "move_monitor_prev", to: &config.bindings.moveMonitorPrev, report: report)
             applyBinding(bindings, "move_monitor_next", to: &config.bindings.moveMonitorNext, report: report)
             applyBinding(bindings, "last_workspace", to: &config.bindings.lastWorkspace, report: report)
+            applyBinding(bindings, "reload_config", to: &config.bindings.reloadConfig, report: report)
         }
 
         if let customs = toml["custom"] as? [[String: Any]] {
@@ -494,6 +510,12 @@ package struct Config {
         return AppRule(app: name, workspace: workspace, float: float)
     }
 
+    private static func cgFloat(_ value: Any?) -> CGFloat? {
+        if let value = value as? Double { return CGFloat(value) }
+        if let value = value as? Int { return CGFloat(value) }
+        return nil
+    }
+
     private static func parseKeyString(_ s: String) -> (key: UInt16?, shift: Bool) {
         if s.hasPrefix("shift+") {
             let name = String(s.dropFirst(6))
@@ -526,6 +548,8 @@ package struct Config {
         bar = true
         menu_bar_icon = true
         bar_font = "menubar"
+        border_width = 2
+        border_radius = 8
 
         [bindings]
         focus_next = "j"
@@ -542,6 +566,7 @@ package struct Config {
         move_monitor_prev = "shift+comma"
         move_monitor_next = "shift+period"
         last_workspace = "tab"
+        reload_config = "shift+c"
         """
     }
 }

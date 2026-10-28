@@ -218,6 +218,8 @@ package final class Hotkeys {
             Config.adjustMasterRatio(-Config.masterRatioStep)
         case .increaseMaster:
             Config.adjustMasterRatio(Config.masterRatioStep)
+        case .reloadConfig:
+            ParketRuntime.shared.reloadConfig()
         case .customCommand(_, let command):
             run(command)
         }

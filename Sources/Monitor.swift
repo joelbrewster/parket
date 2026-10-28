@@ -407,7 +407,7 @@ package final class Monitor {
                     previousAttempt: nil
                 )
             }
-            FocusBorder.shared.update()
+            FocusBorder.shared.concealUntilSettled()
             return tileFrame
         }
     }

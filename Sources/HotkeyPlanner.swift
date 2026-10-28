@@ -13,6 +13,7 @@ package enum HotkeyAction: Equatable {
     case spawnTerminal
     case decreaseMaster
     case increaseMaster
+    case reloadConfig
     case customCommand(index: Int, command: String)
 
     package var diagnosticLabel: String {
@@ -45,6 +46,8 @@ package enum HotkeyAction: Equatable {
             return "decrease_master"
         case .increaseMaster:
             return "increase_master"
+        case .reloadConfig:
+            return "reload_config"
         case .customCommand(let index, _):
             return "custom#\(index)"
         }
@@ -80,6 +83,8 @@ package enum HotkeyAction: Equatable {
             return "decrease_master"
         case .increaseMaster:
             return "increase_master"
+        case .reloadConfig:
+            return "reload_config"
         case .customCommand:
             return "custom_command"
         }
@@ -224,6 +229,7 @@ package enum HotkeyPlanner {
         add(key: bindings.moveMonitorPrev.key, shift: bindings.moveMonitorPrev.shift, action: .moveWindowToMonitor(-1))
         add(key: bindings.moveMonitorNext.key, shift: bindings.moveMonitorNext.shift, action: .moveWindowToMonitor(1))
         add(key: bindings.lastWorkspace.key, shift: bindings.lastWorkspace.shift, action: .switchToLastWorkspace)
+        add(key: bindings.reloadConfig.key, shift: bindings.reloadConfig.shift, action: .reloadConfig)
 
         return HotkeyPlan(registrations: registrations, skipped: skipped)
     }

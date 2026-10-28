@@ -11,7 +11,7 @@
 # focus the window under the mouse pointer when the pointer moves onto it
 # focus_follows_mouse = false
 
-# dwm-style bar at the top of each display (default on)
+# dwm-style bar over the macOS menu bar (default on)
 # bar = true
 
 # menu bar extra with workspace badges (default on)
@@ -25,6 +25,10 @@
 
 # global modifier key: "option", "control", "command"
 # modifier = "option"
+
+# focused window outline
+# border_width = 2
+# border_radius = 8
 
 # built-in action bindings
 # key names: a-z, 0-9, return, tab, space, escape, delete,
@@ -46,6 +50,7 @@
 # move_monitor_prev = "shift+comma"
 # move_monitor_next = "shift+period"
 # last_workspace = "tab"
+# reload_config = "shift+c"
 
 # custom key bindings that run shell commands
 # [[custom]]

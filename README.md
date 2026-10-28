@@ -45,6 +45,7 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + F` | Toggle floating on the focused window |
 | `Option + H` / `Option + L` | Shrink or grow the master column |
 | `Option + B` | Show or hide the top bar |
+| `Option + Shift + C` | Reload config |
 | `Option + Shift + Return` | Spawn a new window of the default terminal |
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
 | `Option + Shift + ,` / `Option + Shift + .` | Move window to previous or next monitor |
@@ -57,6 +58,7 @@ Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Open Conf
 
 - 10 workspaces per display.
 - Master-stack and monocle layouts.
+- The top bar overlays the macOS menu bar; windows still tile below the system menu bar.
 - One native tab group counts as one tileable window.
 - Panels, dialogs, minimized windows, fullscreen windows, and dead AX elements stay out of workspace state.
 - Recovery actions bring tracked windows back onscreen.
@@ -71,9 +73,11 @@ master_ratio = 0.55
 modifier = "option"
 workspace_letter_keys = false  # true also binds q-p to workspaces 1-10
 focus_follows_mouse = false    # true focuses the window the pointer moves onto
-bar = true                     # false hides the top bar; right-click the bar or menu extra
+bar = true                     # false hides the overlay bar; right-click the bar or menu extra
 menu_bar_icon = true           # false hides the menu bar extra
 bar_font = "menubar"           # "menubar" or "mono" (Yakshaven)
+border_width = 2
+border_radius = 8
 
 [bindings]
 focus_next = "j"
@@ -85,7 +89,12 @@ toggle_bar = "b"
 spawn_terminal = "shift+return"
 decrease_master = "h"
 increase_master = "l"
+focus_monitor_prev = "comma"
+focus_monitor_next = "period"
+move_monitor_prev = "shift+comma"
+move_monitor_next = "shift+period"
 last_workspace = "tab"
+reload_config = "shift+c"
 
 [[rules]]
 app = "Finder"

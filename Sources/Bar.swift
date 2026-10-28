@@ -2,11 +2,17 @@ import AppKit
 
 package enum BarLayout {
     package static let height: CGFloat = 28
-    package static let gap: CGFloat = 0
+    package static let gap: CGFloat = 2
     package static var reservedTop: CGFloat { height + gap }
+
+    package static func overlayHeight(menuBar: CGFloat) -> CGFloat {
+        max(menuBar, height)
+    }
 
     package static func windowFrame(for screen: NSScreen) -> CGRect {
         let frame = screen.frame
+        let visible = screen.visibleFrame
+        let height = overlayHeight(menuBar: frame.maxY - visible.maxY)
         return CGRect(
             x: frame.origin.x,
             y: frame.maxY - height,
@@ -16,7 +22,7 @@ package enum BarLayout {
     }
 
     package static func tileFrame(screenFrame: CGRect, visibleFrame: CGRect) -> CGRect {
-        let top = screenFrame.minY + reservedTop
+        let top = screenFrame.minY + overlayHeight(menuBar: visibleFrame.minY - screenFrame.minY) + gap
         return CGRect(
             x: visibleFrame.minX,
             y: top,
@@ -196,7 +202,7 @@ private final class BarPanel: NSPanel {
         isMovable = false
         hasShadow = false
         isOpaque = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 1)
+        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
         backgroundColor = MenuBarChrome.color
@@ -234,6 +240,7 @@ private final class BarContentView: NSView {
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         wantsLayer = true
+        layer?.isOpaque = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
     }
 
@@ -277,13 +284,13 @@ private final class BarContentView: NSView {
         var x: CGFloat = 0
         hits = []
 
+        let pad = Config.shared.borderWidth
         let tagSide = bounds.height
         let markSide: CGFloat = 5
         for (index, tag) in tags.enumerated() {
             let rect = NSRect(x: x, y: 0, width: tagSide, height: tagSide)
             if tag.active {
-                NSColor.controlAccentColor.setFill()
-                rect.fill()
+                fillAccent(rect.insetBy(dx: pad, dy: pad))
             }
             drawText(
                 "\(tag.number)",
@@ -326,13 +333,12 @@ private final class BarContentView: NSView {
         let titleSlot = max(0, clockRect.minX - x)
         let accentRect = NSRect(
             x: x + titleMargin,
-            y: 0,
+            y: pad,
             width: max(0, titleSlot - titleMargin * 2),
-            height: bounds.height
+            height: max(0, bounds.height - pad * 2)
         )
         if titleHighlighted && !titleText.isEmpty {
-            NSColor.controlAccentColor.setFill()
-            accentRect.fill()
+            fillAccent(accentRect)
         }
         drawText(
             titleText,
@@ -361,6 +367,16 @@ private final class BarContentView: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         StatusBar.shared.popUpMenu(with: event, in: self)
+    }
+
+    private func fillAccent(_ rect: NSRect) {
+        let radius = min(
+            Config.shared.borderRadius,
+            max(0, rect.width / 2),
+            max(0, rect.height / 2)
+        )
+        MenuBarChrome.accent.setFill()
+        NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
     }
 
     private func cellWidth(_ text: String, font: NSFont) -> CGFloat {

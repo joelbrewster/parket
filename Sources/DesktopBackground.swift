@@ -14,6 +14,17 @@ enum MenuBarChrome {
             ? NSColor(srgbRed: 0.118, green: 0.118, blue: 0.118, alpha: 1)
             : NSColor(srgbRed: 0.965, green: 0.965, blue: 0.965, alpha: 1)
     }
+
+    static var accent: NSColor {
+        var result = NSColor.controlAccentColor
+        appearance.performAsCurrentDrawingAppearance {
+            let color = NSColor.controlAccentColor
+            if let rgb = color.usingColorSpace(.sRGB) {
+                result = NSColor(srgbRed: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent, alpha: 1)
+            }
+        }
+        return result
+    }
 }
 
 @MainActor

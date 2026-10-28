@@ -126,6 +126,7 @@ package final class ParketRuntime {
             }
             Hotkeys.shared.reload()
             MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
+            FocusBorder.shared.update()
         }
         StatusBar.shared.refresh()
         fputs("parket: config reloaded\n", stderr)
