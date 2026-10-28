@@ -11,6 +11,15 @@
 # focus the window under the mouse pointer when the pointer moves onto it
 # focus_follows_mouse = false
 
+# dwm-style bar at the top of each display (default on)
+# bar = true
+
+# menu bar extra with workspace badges (default on)
+# menu_bar_icon = true
+
+# bar typeface: "menubar" (macOS menu bar) or "mono" (Yakshaven)
+# bar_font = "menubar"
+
 # master window width ratio (0.0-1.0)
 # master_ratio = 0.55
 

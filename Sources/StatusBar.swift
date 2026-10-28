@@ -17,6 +17,12 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         title: "Open Accessibility Settings", action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let recheckAccessibilityItem = NSMenuItem(
         title: "Recheck Accessibility", action: #selector(recheckPermissions), keyEquivalent: "")
+    private let barItem = NSMenuItem(title: "Show Bar", action: #selector(toggleBar), keyEquivalent: "")
+    private let menuBarIconItem = NSMenuItem(
+        title: "Show Menu Bar Icon", action: #selector(toggleMenuBarIcon), keyEquivalent: "")
+    private let barFontItem = NSMenuItem(title: "Bar Font", action: nil, keyEquivalent: "")
+    private let menubarFontItem = NSMenuItem(title: "Menu Bar", action: #selector(useMenubarFont), keyEquivalent: "")
+    private let monoFontItem = NSMenuItem(title: "Yakshaven", action: #selector(useMonoFont), keyEquivalent: "")
     private let openConfigItem = NSMenuItem(title: "Open Config", action: #selector(openConfig), keyEquivalent: "")
     private let reloadItem = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig), keyEquivalent: "r")
     private let copyDiagnosticsItem = NSMenuItem(
@@ -33,6 +39,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         super.init()
         buildMenu()
         installContentView()
+        applyVisibility()
         update()
     }
 
@@ -44,6 +51,10 @@ package final class StatusBar: NSObject, NSMenuDelegate {
             restoreItem,
             openAccessibilityItem,
             recheckAccessibilityItem,
+            barItem,
+            menuBarIconItem,
+            menubarFontItem,
+            monoFontItem,
             openConfigItem,
             reloadItem,
             copyDiagnosticsItem,
@@ -62,6 +73,14 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         menu.addItem(openAccessibilityItem)
         menu.addItem(recheckAccessibilityItem)
         menu.addItem(configSeparator)
+        let fontMenu = NSMenu()
+        fontMenu.addItem(menubarFontItem)
+        fontMenu.addItem(monoFontItem)
+        barFontItem.submenu = fontMenu
+
+        menu.addItem(barItem)
+        menu.addItem(menuBarIconItem)
+        menu.addItem(barFontItem)
         menu.addItem(openConfigItem)
         menu.addItem(reloadItem)
         menu.addItem(diagnosticsSeparator)
@@ -94,6 +113,15 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         updateMenu()
     }
 
+    package func popUpMenu(with event: NSEvent, in view: NSView) {
+        updateMenu()
+        NSMenu.popUpContextMenu(menu, with: event, for: view)
+    }
+
+    package func applyVisibility() {
+        statusItem.isVisible = Config.shared.menuBarIcon
+    }
+
     @objc private func openAccessibilitySettings() {
         Permissions.requestAccessibility()
         Permissions.openAccessibilitySettings()
@@ -124,6 +152,27 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         Config.openConfig()
     }
 
+    @objc private func toggleBar() {
+        Config.setChrome(bar: !Config.shared.bar)
+    }
+
+    @objc private func toggleMenuBarIcon() {
+        Config.setChrome(menuBarIcon: !Config.shared.menuBarIcon)
+    }
+
+    @objc private func useMenubarFont() {
+        Config.setBarFont(.menubar)
+    }
+
+    @objc private func useMonoFont() {
+        Config.setBarFont(.mono)
+    }
+
+    package func refresh() {
+        lastState = nil
+        update()
+    }
+
     @objc private func copyDiagnosticReport() {
         let pasteboard = NSPasteboard.general
         pasteboard.clearContents()
@@ -147,7 +196,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         updateMenu()
 
         var segments: [StatusSegment] = []
-        let font = NSFont.menuBarFont(ofSize: 0)
+        let font = Config.shared.barFont.nsFont()
         let fontSize = font.pointSize
         let runtime = ParketRuntime.shared
 
@@ -221,6 +270,10 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         reloadItem.isEnabled = true
         openConfigItem.isEnabled = true
         copyDiagnosticsItem.isEnabled = true
+        barItem.state = Config.shared.bar ? .on : .off
+        menuBarIconItem.state = Config.shared.menuBarIcon ? .on : .off
+        menubarFontItem.state = Config.shared.barFont == .menubar ? .on : .off
+        monoFontItem.state = Config.shared.barFont == .mono ? .on : .off
     }
 
     private func stateSummaryTitle() -> String {
@@ -273,7 +326,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
     }
 
     private func applySegments(_ segments: [StatusSegment], fontSize: CGFloat) {
-        contentView.update(segments: segments, fontSize: fontSize)
+        contentView.update(segments: segments, fontSize: fontSize, font: Config.shared.barFont.nsFont())
         statusItem.length = contentView.intrinsicContentSize.width
     }
 }
@@ -310,8 +363,7 @@ enum TileGlyph {
     }
 }
 
-private func drawCenteredText(_ text: String, in bounds: NSRect, fontSize: CGFloat, color: NSColor, ctx: CGContext) {
-    let font = NSFont.systemFont(ofSize: fontSize - 1)
+private func drawCenteredText(_ text: String, in bounds: NSRect, font: NSFont, color: NSColor, ctx: CGContext) {
     let str = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
     let line = CTLineCreateWithAttributedString(str)
     let lineBounds = CTLineGetBoundsWithOptions(line, .useOpticalBounds)
@@ -418,6 +470,7 @@ private final class StatusContentView: NSView {
 
     private var segments: [StatusSegment] = []
     private var fontSize: CGFloat = NSFont.menuBarFont(ofSize: 0).pointSize
+    private var font = NSFont.menuBarFont(ofSize: 0)
 
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError() }
@@ -426,10 +479,11 @@ private final class StatusContentView: NSView {
         super.init(frame: frameRect)
     }
 
-    func update(segments: [StatusSegment], fontSize: CGFloat) {
-        guard self.segments != segments || self.fontSize != fontSize else { return }
+    func update(segments: [StatusSegment], fontSize: CGFloat, font: NSFont) {
+        guard self.segments != segments || self.fontSize != fontSize || self.font != font else { return }
         self.segments = segments
         self.fontSize = fontSize
+        self.font = font
         setAccessibilityElement(true)
         setAccessibilityLabel(segments.map(\.accessibilityLabel).joined(separator: ", "))
         invalidateIntrinsicContentSize()
@@ -499,12 +553,12 @@ private final class StatusContentView: NSView {
             ctx.setFillColor(badgeColor.cgColor)
             ctx.fillPath()
             ctx.setBlendMode(.destinationOut)
-            drawCenteredText("\(number)", in: rect, fontSize: fontSize, color: .black, ctx: ctx)
+            drawCenteredText("\(number)", in: rect, font: font.withSize(fontSize - 1), color: .black, ctx: ctx)
         } else {
             ctx.setStrokeColor(badgeColor.cgColor)
             ctx.setLineWidth(1)
             ctx.strokePath()
-            drawCenteredText("\(number)", in: rect, fontSize: fontSize, color: badgeColor, ctx: ctx)
+            drawCenteredText("\(number)", in: rect, font: font.withSize(fontSize - 1), color: badgeColor, ctx: ctx)
         }
     }
 
@@ -544,7 +598,7 @@ private final class StatusContentView: NSView {
         ctx.setStrokeColor(badgeColor.cgColor)
         ctx.setLineWidth(1)
         ctx.strokePath()
-        drawCenteredText("\(number)", in: screenRect, fontSize: fontSize, color: badgeColor, ctx: ctx)
+        drawCenteredText("\(number)", in: screenRect, font: font.withSize(fontSize - 1), color: badgeColor, ctx: ctx)
     }
 
     private func drawMonocleBadge(windowCount: Int, in rect: NSRect, ctx: CGContext) {
@@ -570,7 +624,7 @@ private final class StatusContentView: NSView {
                 width: badgeRect.maxX - iconRect.maxX - 3,
                 height: badgeRect.height
             )
-            drawCenteredText("\(windowCount)", in: textRect, fontSize: fontSize, color: badgeColor, ctx: ctx)
+            drawCenteredText("\(windowCount)", in: textRect, font: font.withSize(fontSize - 1), color: badgeColor, ctx: ctx)
         }
     }
 

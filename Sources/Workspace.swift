@@ -406,6 +406,10 @@ package final class WorkspaceManager {
         ProcessInfo.processInfo.systemUptime < ignoreExternalFocusUntil
     }
 
+    package func applyChrome() {
+        performScreenChange()
+    }
+
     package func handleScreenChange() {
         extendScreenChangeSettleWindow(
             by: Self.screenChangeDebounceDelay * Double(Self.screenChangeMaxAttempts + 2))
@@ -589,10 +593,12 @@ package final class WorkspaceManager {
                 return Monitor(
                     displayID: displayID,
                     screen: screen,
-                    tileFrame: BarLayout.tileFrame(
-                        screenFrame: geometry.frame,
-                        visibleFrame: geometry.visibleFrame
-                    ),
+                    tileFrame: Config.shared.bar
+                        ? BarLayout.tileFrame(
+                            screenFrame: geometry.frame,
+                            visibleFrame: geometry.visibleFrame
+                        )
+                        : geometry.visibleFrame,
                     offscreenContext: OffscreenWindowPlacementContext(
                         screen: geometry.visibleFrame,
                         visibleScreens: visibleScreens

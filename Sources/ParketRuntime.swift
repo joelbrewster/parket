@@ -15,6 +15,7 @@ package final class ParketRuntime {
     package func start() {
         Config.load()
         _ = StatusBar.shared
+        StatusBar.shared.applyVisibility()
         refreshPermissions(prompt: false)
     }
 
@@ -57,6 +58,9 @@ package final class ParketRuntime {
             "config_path: \(Config.path)",
             "workspace_count: \(Config.shared.workspaceCount)",
             "focus_follows_mouse: \(Config.shared.focusFollowsMouse)",
+            "bar: \(Config.shared.bar ? "on" : "off")",
+            "menu_bar_icon: \(Config.shared.menuBarIcon ? "on" : "off")",
+            "bar_font: \(Config.shared.barFont.rawValue)",
             "monitor_count: \(ws.monitors.count)",
             "ax_messaging_timeout_seconds: \(WindowManager.messagingTimeoutSeconds)",
         ])
@@ -110,13 +114,20 @@ package final class ParketRuntime {
     }
 
     package func reloadConfig() {
+        let barWas = Config.shared.bar
         Config.load()
+        StatusBar.shared.applyVisibility()
         if isRunning {
             WorkspaceManager.shared.applyCurrentConfig()
+            if Config.shared.bar != barWas {
+                WorkspaceManager.shared.applyChrome()
+            } else {
+                Bar.shared.sync(screens: NSScreen.screens)
+            }
             Hotkeys.shared.reload()
             MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
         }
-        StatusBar.shared.update()
+        StatusBar.shared.refresh()
         fputs("parket: config reloaded\n", stderr)
     }
 

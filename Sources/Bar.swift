@@ -59,6 +59,12 @@ package final class Bar {
 
     package func sync(screens: [NSScreen]) {
         guard started else { return }
+        guard Config.shared.bar else {
+            for id in panels.keys {
+                panels.removeValue(forKey: id)?.close()
+            }
+            return
+        }
         let ids = Set(screens.map { WindowManager.displayID(for: $0) })
         for id in panels.keys where !ids.contains(id) {
             panels.removeValue(forKey: id)?.close()
@@ -254,8 +260,7 @@ private final class BarContentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
-        let font = NSFont.menuBarFont(ofSize: 0)
-        let mono = NSFont.monospacedSystemFont(ofSize: font.pointSize, weight: .medium)
+        let font = Config.shared.barFont.nsFont()
         var x: CGFloat = 0
         hits = []
 
@@ -283,8 +288,8 @@ private final class BarContentView: NSView {
         }
 
         let symbol = layout == .monocle ? "[M]" : "[]="
-        let layoutRect = NSRect(x: x, y: 0, width: cellWidth(symbol, font: mono), height: bounds.height)
-        drawText(symbol, in: layoutRect, font: mono, color: .labelColor)
+        let layoutRect = NSRect(x: x, y: 0, width: cellWidth(symbol, font: font), height: bounds.height)
+        drawText(symbol, in: layoutRect, font: font, color: .labelColor)
         hits.append((.layout, layoutRect))
         x = layoutRect.maxX
 
@@ -308,6 +313,10 @@ private final class BarContentView: NSView {
     }
 
     override func mouseDown(with event: NSEvent) {
+        if event.modifierFlags.contains(.control) {
+            StatusBar.shared.popUpMenu(with: event, in: self)
+            return
+        }
         let point = convert(event.locationInWindow, from: nil)
         guard let hit = hits.first(where: { $0.1.contains(point) })?.0 else { return }
         switch hit {
@@ -316,6 +325,10 @@ private final class BarContentView: NSView {
         case .layout:
             WorkspaceManager.shared.toggleLayout(displayID: displayID)
         }
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        StatusBar.shared.popUpMenu(with: event, in: self)
     }
 
     private func cellWidth(_ text: String, font: NSFont) -> CGFloat {

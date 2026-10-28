@@ -72,6 +72,22 @@ struct ConfigTests {
         #expect(config.focusFollowsMouse)
     }
 
+    @Test func barDefaultsOnAndParsesOff() throws {
+        #expect(Config().bar)
+        #expect(Config().menuBarIcon)
+        let hidden = try #require(Config.parse("bar = false\nmenu_bar_icon = false"))
+        #expect(!hidden.bar)
+        #expect(!hidden.menuBarIcon)
+    }
+
+    @Test func barFontDefaultsMenubarAndParsesMono() throws {
+        #expect(Config().barFont == .menubar)
+        let mono = try #require(Config.parse("bar_font = \"mono\""))
+        #expect(mono.barFont == .mono)
+        let alias = try #require(Config.parse("bar_font = \"monospace\""))
+        #expect(alias.barFont == .mono)
+    }
+
     @Test func workspaceLetterKeysDefaultOffAndParse() throws {
         #expect(!Config().workspaceLetterKeys)
         let config = try #require(Config.parse("workspace_letter_keys = true"))

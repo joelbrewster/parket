@@ -67,6 +67,9 @@ master_ratio = 0.55
 modifier = "option"
 workspace_letter_keys = false  # true also binds q-p to workspaces 1-10
 focus_follows_mouse = false    # true focuses the window the pointer moves onto
+bar = true                     # false hides the top bar; right-click the bar or menu extra
+menu_bar_icon = true           # false hides the menu bar extra
+bar_font = "menubar"           # "menubar" or "mono" (Yakshaven)
 
 [bindings]
 focus_next = "j"

@@ -6,6 +6,22 @@ package enum HotkeyModifier: String, Equatable {
     case command
 }
 
+package enum BarFont: String, Equatable {
+    case menubar
+    case mono
+
+    func nsFont() -> NSFont {
+        let size: CGFloat = 14
+        switch self {
+        case .menubar:
+            return NSFont.menuBarFont(ofSize: size)
+        case .mono:
+            return NSFont(name: "Yakshaven", size: size)
+                ?? NSFont.monospacedSystemFont(ofSize: size, weight: .regular)
+        }
+    }
+}
+
 package struct Binding {
     let key: UInt16
     let shift: Bool
@@ -157,6 +173,9 @@ package struct Config {
     package var modifier: HotkeyModifier = .option
     package var workspaceLetterKeys = false
     package var focusFollowsMouse = false
+    package var bar = true
+    package var menuBarIcon = true
+    package var barFont: BarFont = .menubar
     package var customBindings: [Binding] = [
         Binding(key: Key.return, shift: true, command: "open -n -a Terminal")
     ]
@@ -213,6 +232,25 @@ package struct Config {
             config.focusFollowsMouse = followsMouse
         }
 
+        if let bar = toml["bar"] as? Bool {
+            config.bar = bar
+        }
+
+        if let menuBarIcon = toml["menu_bar_icon"] as? Bool {
+            config.menuBarIcon = menuBarIcon
+        }
+
+        if let font = toml["bar_font"] as? String {
+            switch font {
+            case "menubar", "menu":
+                config.barFont = .menubar
+            case "mono", "monospace":
+                config.barFont = .mono
+            default:
+                report("unknown bar_font '\(font)', using menubar")
+            }
+        }
+
         if let mod = toml["modifier"] as? String {
             switch mod {
             case "option": config.modifier = .option
@@ -264,6 +302,86 @@ package struct Config {
         NSWorkspace.shared.open(url)
     }
 
+    @MainActor
+    package static func setChrome(bar: Bool? = nil, menuBarIcon: Bool? = nil) {
+        var nextBar = bar ?? shared.bar
+        var nextIcon = menuBarIcon ?? shared.menuBarIcon
+        if !nextBar && !nextIcon {
+            if bar != nil {
+                nextIcon = true
+            } else {
+                nextBar = true
+            }
+        }
+        let barChanged = nextBar != shared.bar
+        shared.bar = nextBar
+        shared.menuBarIcon = nextIcon
+        upsertBool("bar", nextBar)
+        upsertBool("menu_bar_icon", nextIcon)
+        StatusBar.shared.applyVisibility()
+        if barChanged {
+            WorkspaceManager.shared.applyChrome()
+        } else {
+            Bar.shared.sync(screens: NSScreen.screens)
+        }
+        StatusBar.shared.update()
+    }
+
+    @MainActor
+    package static func setBarFont(_ font: BarFont) {
+        shared.barFont = font
+        upsertString("bar_font", font.rawValue)
+        StatusBar.shared.refresh()
+    }
+
+    private static func upsertBool(_ key: String, _ value: Bool) {
+        let manager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        if !manager.fileExists(atPath: directory.path) {
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
+        let line = "\(key) = \(value ? "true" : "false")"
+        let pattern = "^\(NSRegularExpression.escapedPattern(for: key))\\s*=\\s*(true|false)"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .anchorsMatchLines),
+            regex.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil
+        {
+            text = regex.stringByReplacingMatches(
+                in: text,
+                options: [],
+                range: NSRange(text.startIndex..., in: text),
+                withTemplate: line
+            )
+        } else {
+            text = line + "\n" + text
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func upsertString(_ key: String, _ value: String) {
+        let manager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        if !manager.fileExists(atPath: directory.path) {
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
+        let line = "\(key) = \"\(value)\""
+        let pattern = "^\(NSRegularExpression.escapedPattern(for: key))\\s*=\\s*\".*\""
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .anchorsMatchLines),
+            regex.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil
+        {
+            text = regex.stringByReplacingMatches(
+                in: text,
+                options: [],
+                range: NSRange(text.startIndex..., in: text),
+                withTemplate: line
+            )
+        } else {
+            text = line + "\n" + text
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
     private static func parseKeyString(_ s: String) -> (key: UInt16?, shift: Bool) {
         if s.hasPrefix("shift+") {
             let name = String(s.dropFirst(6))
@@ -293,6 +411,9 @@ package struct Config {
         modifier = "option"
         workspace_letter_keys = false
         focus_follows_mouse = false
+        bar = true
+        menu_bar_icon = true
+        bar_font = "menubar"
 
         [bindings]
         focus_next = "j"
