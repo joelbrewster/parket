@@ -2,7 +2,6 @@ import AppKit
 
 package enum FocusBorderLayout {
     package static let width: CGFloat = 2
-    package static let windowRadius: CGFloat = 10
 
     package static func windowFrame(from tile: CGRect) -> CGRect {
         tile.insetBy(dx: width, dy: width)
@@ -29,7 +28,7 @@ package final class FocusBorder {
         let border = panel ?? FocusBorderPanel()
         panel = border
         border.place(frame)
-        border.orderFrontRegardless()
+        border.orderBack(nil)
     }
 
     package func applyAppearance() {
@@ -75,7 +74,7 @@ private final class FocusBorderPanel: NSPanel {
             backing: .buffered,
             defer: false
         )
-        isFloatingPanel = true
+        isFloatingPanel = false
         becomesKeyOnlyIfNeeded = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
@@ -83,7 +82,7 @@ private final class FocusBorderPanel: NSPanel {
         hasShadow = false
         isOpaque = false
         ignoresMouseEvents = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 2)
+        level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
         backgroundColor = .clear
@@ -114,16 +113,12 @@ private final class FocusBorderView: NSView {
     override var isOpaque: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        let innerRect = bounds.insetBy(dx: FocusBorderLayout.width, dy: FocusBorderLayout.width)
-        let radius = min(
-            FocusBorderLayout.windowRadius,
-            innerRect.width / 2,
-            innerRect.height / 2
-        )
-        let path = NSBezierPath(rect: bounds)
-        path.append(NSBezierPath(roundedRect: innerRect, xRadius: radius, yRadius: radius))
-        path.windingRule = .evenOdd
-        NSColor.controlAccentColor.setFill()
-        path.fill()
+        let color = NSColor.controlAccentColor
+        guard let gradient = NSGradient(starting: color, ending: color.withAlphaComponent(0)) else {
+            color.setFill()
+            bounds.fill()
+            return
+        }
+        gradient.draw(in: bounds, angle: -90)
     }
 }
