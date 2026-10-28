@@ -149,6 +149,8 @@ package struct BuiltinBindings {
     var focusPrev: (key: UInt16, shift: Bool) = (Key.k, false)
     var swapMaster: (key: UInt16, shift: Bool) = (Key.return, false)
     var toggleLayout: (key: UInt16, shift: Bool) = (Key.m, false)
+    var toggleBar: (key: UInt16, shift: Bool) = (Key.b, false)
+    var spawnTerminal: (key: UInt16, shift: Bool) = (Key.return, true)
     var focusMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, false)
     var focusMonitorNext: (key: UInt16, shift: Bool) = (Key.period, false)
     var moveMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, true)
@@ -176,9 +178,7 @@ package struct Config {
     package var bar = true
     package var menuBarIcon = true
     package var barFont: BarFont = .menubar
-    package var customBindings: [Binding] = [
-        Binding(key: Key.return, shift: true, command: "open -n -a Terminal")
-    ]
+    package var customBindings: [Binding] = []
     package var bindings = BuiltinBindings()
 
     package private(set) var numberKeys: [UInt16: Int] = buildNumberKeys(count: defaultWorkspaceCount)
@@ -265,6 +265,8 @@ package struct Config {
             applyBinding(bindings, "focus_prev", to: &config.bindings.focusPrev, report: report)
             applyBinding(bindings, "swap_master", to: &config.bindings.swapMaster, report: report)
             applyBinding(bindings, "toggle_layout", to: &config.bindings.toggleLayout, report: report)
+            applyBinding(bindings, "toggle_bar", to: &config.bindings.toggleBar, report: report)
+            applyBinding(bindings, "spawn_terminal", to: &config.bindings.spawnTerminal, report: report)
             applyBinding(bindings, "focus_monitor_prev", to: &config.bindings.focusMonitorPrev, report: report)
             applyBinding(bindings, "focus_monitor_next", to: &config.bindings.focusMonitorNext, report: report)
             applyBinding(bindings, "move_monitor_prev", to: &config.bindings.moveMonitorPrev, report: report)
@@ -303,10 +305,10 @@ package struct Config {
     }
 
     @MainActor
-    package static func setChrome(bar: Bool? = nil, menuBarIcon: Bool? = nil) {
+    package static func setChrome(bar: Bool? = nil, menuBarIcon: Bool? = nil, allowHidden: Bool = false) {
         var nextBar = bar ?? shared.bar
         var nextIcon = menuBarIcon ?? shared.menuBarIcon
-        if !nextBar && !nextIcon {
+        if !allowHidden && !nextBar && !nextIcon {
             if bar != nil {
                 nextIcon = true
             } else {
@@ -420,15 +422,13 @@ package struct Config {
         focus_prev = "k"
         swap_master = "return"
         toggle_layout = "m"
+        toggle_bar = "b"
+        spawn_terminal = "shift+return"
         focus_monitor_prev = "comma"
         focus_monitor_next = "period"
         move_monitor_prev = "shift+comma"
         move_monitor_next = "shift+period"
         last_workspace = "tab"
-
-        [[custom]]
-        key = "shift+return"
-        command = "open -n -a Terminal"
         """
     }
 }

@@ -42,6 +42,8 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + Return` | Swap focused window with master |
 | `Option + Tab` | Switch to last active workspace |
 | `Option + M` | Toggle monocle layout |
+| `Option + B` | Show or hide the top bar |
+| `Option + Shift + Return` | Spawn a new window of the default terminal |
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
 | `Option + Shift + ,` / `Option + Shift + .` | Move window to previous or next monitor |
 
@@ -76,11 +78,9 @@ focus_next = "j"
 focus_prev = "k"
 swap_master = "return"
 toggle_layout = "m"
+toggle_bar = "b"
+spawn_terminal = "shift+return"
 last_workspace = "tab"
-
-[[custom]]
-key = "shift+return"
-command = "open -n -a Terminal"
 ```
 
 Bindings use the configured modifier key. Prefix a key with `shift+` to add Shift. See [config.example.toml](config.example.toml) for supported key names and defaults.

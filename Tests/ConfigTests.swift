@@ -108,6 +108,6 @@ struct ConfigTests {
 
         #expect(config.workspaceCount == Config.defaultWorkspaceCount)
         #expect(config.masterRatio == Config.defaultMasterRatio)
-        #expect(config.customBindings.count == 1)
+        #expect(config.customBindings.isEmpty)
     }
 }

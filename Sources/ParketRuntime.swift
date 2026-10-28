@@ -143,6 +143,7 @@ package final class ParketRuntime {
         registerScreenObserver()
         Hotkeys.shared.start()
         MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
+        DesktopBackground.shared.start()
         isRunning = true
         fputs("parket: running\n", stderr)
     }

@@ -55,6 +55,7 @@ package final class Bar {
             clockTimer = timer
         }
         Weather.shared.start()
+        DesktopBackground.shared.start()
         sync(screens: NSScreen.screens)
     }
 
@@ -183,38 +184,16 @@ private final class BarPanel: NSPanel {
         isReleasedWhenClosed = false
         isMovable = false
         hasShadow = false
-        isOpaque = false
+        isOpaque = true
         level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
-        backgroundColor = .clear
+        backgroundColor = MenuBarChrome.color
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
 
-        let root = NSView()
-        let effect = NSVisualEffectView()
-        effect.material = .menu
-        effect.blendingMode = .behindWindow
-        effect.state = .active
-        effect.isEmphasized = true
-        effect.translatesAutoresizingMaskIntoConstraints = false
-        barView.translatesAutoresizingMaskIntoConstraints = false
         barView.displayID = displayID
-        root.addSubview(effect)
-        root.addSubview(barView)
-        contentView = root
-        if let root = contentView {
-            NSLayoutConstraint.activate([
-                effect.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-                effect.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-                effect.topAnchor.constraint(equalTo: root.topAnchor),
-                effect.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-                barView.leadingAnchor.constraint(equalTo: root.leadingAnchor),
-                barView.trailingAnchor.constraint(equalTo: root.trailingAnchor),
-                barView.topAnchor.constraint(equalTo: root.topAnchor),
-                barView.bottomAnchor.constraint(equalTo: root.bottomAnchor),
-            ])
-        }
+        contentView = barView
     }
 
     override var canBecomeKey: Bool { false }
@@ -250,7 +229,7 @@ private final class BarContentView: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override var isFlipped: Bool { true }
-    override var isOpaque: Bool { false }
+    override var isOpaque: Bool { true }
     override var acceptsFirstResponder: Bool { false }
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
@@ -278,6 +257,8 @@ private final class BarContentView: NSView {
     }
 
     override func draw(_ dirtyRect: NSRect) {
+        MenuBarChrome.color.setFill()
+        bounds.fill()
         let font = Config.shared.barFont.nsFont()
         var x: CGFloat = 0
         hits = []

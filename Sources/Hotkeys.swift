@@ -208,6 +208,10 @@ package final class Hotkeys {
             WorkspaceManager.shared.swapMaster()
         case .toggleLayout:
             WorkspaceManager.shared.toggleLayout()
+        case .toggleBar:
+            Config.setChrome(bar: !Config.shared.bar, allowHidden: true)
+        case .spawnTerminal:
+            TerminalLauncher.spawn()
         case .customCommand(_, let command):
             run(command)
         }

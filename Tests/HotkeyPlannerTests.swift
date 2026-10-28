@@ -89,6 +89,20 @@ struct HotkeyPlannerTests {
         #expect(!plan.registrations.contains { $0.chord.key == Key.r })
     }
 
+    @Test func toggleBarAndSpawnTerminalDefaults() {
+        var config = Config()
+        config.customBindings = []
+
+        let plan = HotkeyPlanner.plan(config: config)
+
+        #expect(plan.registrations.contains { $0.chord.key == Key.b && !$0.chord.shift && $0.action == .toggleBar })
+        #expect(
+            plan.registrations.contains {
+                $0.chord.key == Key.return && $0.chord.shift && $0.action == .spawnTerminal
+            }
+        )
+    }
+
     @Test func commandTabIsReservedForSystem() {
         var config = Config()
         config.modifier = .command

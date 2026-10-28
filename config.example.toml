@@ -36,6 +36,8 @@
 # focus_prev = "k"
 # swap_master = "return"
 # toggle_layout = "m"
+# toggle_bar = "b"
+# spawn_terminal = "shift+return"
 # focus_monitor_prev = "comma"
 # focus_monitor_next = "period"
 # move_monitor_prev = "shift+comma"
@@ -44,5 +46,5 @@
 
 # custom key bindings that run shell commands
 # [[custom]]
-# key = "shift+return"
-# command = "open -n -a Terminal"
+# key = "shift+space"
+# command = "open -n -a Safari"
