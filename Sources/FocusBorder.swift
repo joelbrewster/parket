@@ -2,7 +2,15 @@ import AppKit
 
 package enum FocusBorderLayout {
     package static let width: CGFloat = 2
-    package static let innerRadius: CGFloat = 8
+    package static let windowRadius: CGFloat = 10
+
+    package static func windowFrame(from tile: CGRect) -> CGRect {
+        tile.insetBy(dx: width, dy: width)
+    }
+
+    package static func windowFrames(from tiles: [CGRect]) -> [CGRect] {
+        tiles.map(windowFrame(from:))
+    }
 }
 
 @MainActor
@@ -103,7 +111,7 @@ private final class FocusBorderView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         let innerRect = bounds.insetBy(dx: FocusBorderLayout.width, dy: FocusBorderLayout.width)
         let radius = min(
-            FocusBorderLayout.innerRadius,
+            FocusBorderLayout.windowRadius,
             innerRect.width / 2,
             innerRect.height / 2
         )

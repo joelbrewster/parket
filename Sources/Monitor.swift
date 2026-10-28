@@ -340,12 +340,7 @@ package final class Monitor {
             }
             suppressGeometryNotifications()
             let windows = workspaces[active]
-            let frames = Tiler.calculateFrames(
-                count: windows.count,
-                screen: tileFrame,
-                layout: layouts[active],
-                masterRatio: Config.shared.masterRatio
-            )
+            let frames = placedWindowFrames(windowCount: windows.count)
             for i in windows.indices {
                 windows[i].setFrame(frames[i])
             }
@@ -479,12 +474,7 @@ package final class Monitor {
         guard workspaces.indices.contains(active) else { return nil }
         let windows = workspaces[active]
         guard let index = windows.firstIndex(of: window) else { return nil }
-        let frames = Tiler.calculateFrames(
-            count: windows.count,
-            screen: tileFrame,
-            layout: layouts[active],
-            masterRatio: Config.shared.masterRatio
-        )
+        let frames = placedWindowFrames(windowCount: windows.count)
         guard frames.indices.contains(index) else { return nil }
         guard framesMatch(frames[index], target, tolerance: Self.frameTolerance) else { return nil }
         guard let frame = window.getFrame() else { return nil }
@@ -507,12 +497,7 @@ package final class Monitor {
 
     private func activeWorkspaceMatchesLayout(tolerance: CGFloat) -> Bool {
         let windows = workspaces[active]
-        let frames = Tiler.calculateFrames(
-            count: windows.count,
-            screen: tileFrame,
-            layout: layouts[active],
-            masterRatio: Config.shared.masterRatio
-        )
+        let frames = placedWindowFrames(windowCount: windows.count)
         guard frames.count == windows.count else { return false }
 
         for i in windows.indices {
@@ -521,6 +506,17 @@ package final class Monitor {
         }
 
         return true
+    }
+
+    private func placedWindowFrames(windowCount: Int) -> [CGRect] {
+        FocusBorderLayout.windowFrames(
+            from: Tiler.calculateFrames(
+                count: windowCount,
+                screen: tileFrame,
+                layout: layouts[active],
+                masterRatio: Config.shared.masterRatio
+            )
+        )
     }
 
     private func framesMatch(_ lhs: CGRect, _ rhs: CGRect, tolerance: CGFloat) -> Bool {

@@ -54,6 +54,7 @@ package final class Bar {
             RunLoop.main.add(timer, forMode: .common)
             clockTimer = timer
         }
+        Weather.shared.start()
         sync(screens: NSScreen.screens)
     }
 
@@ -80,7 +81,7 @@ package final class Bar {
     }
 
     package func update() {
-        let clock = clockFormatter.string(from: Date())
+        let clock = statusText()
         let ws = WorkspaceManager.shared
         let focusedID = ws.monitors.isEmpty ? nil : ws.focusedMonitor.displayID
         for (id, panel) in panels {
@@ -97,10 +98,16 @@ package final class Bar {
     }
 
     private func refreshClock() {
-        let clock = clockFormatter.string(from: Date())
+        let clock = statusText()
         for panel in panels.values {
             panel.barView.updateClock(clock)
         }
+    }
+
+    private func statusText() -> String {
+        let clock = clockFormatter.string(from: Date())
+        let weather = Weather.shared.text
+        return weather.isEmpty ? clock : "\(weather)  \(clock)"
     }
 
     private func tags(for monitor: Monitor?) -> [BarTag] {
