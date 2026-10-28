@@ -189,6 +189,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
 
     func update() {
         Bar.shared.update()
+        FocusBorder.shared.update()
         let ws = WorkspaceManager.shared
         let state = StatusState.capture(ws)
         guard state != lastState else { return }

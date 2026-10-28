@@ -18,7 +18,7 @@ package final class Monitor {
 
     let displayID: CGDirectDisplayID
     var screen: NSScreen
-    private let tileFrame: CGRect
+    let tileFrame: CGRect
     private let offscreenContext: OffscreenWindowPlacementContext
     var workspaces: [[TrackedWindow]] = Array(repeating: [], count: Config.shared.workspaceCount)
     var layouts: [Layout] = Array(repeating: .tile, count: Config.shared.workspaceCount)
@@ -358,6 +358,7 @@ package final class Monitor {
                     previousAttempt: nil
                 )
             }
+            FocusBorder.shared.update()
             return tileFrame
         }
     }

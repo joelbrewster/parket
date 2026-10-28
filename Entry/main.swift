@@ -13,6 +13,7 @@ final class TerminationCoordinator: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         Bar.shared.start()
+        FocusBorder.shared.update()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
