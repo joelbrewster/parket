@@ -24,6 +24,7 @@ package final class Monitor {
     var layouts: [Layout] = Array(repeating: .tile, count: Config.shared.workspaceCount)
     var focusedIndices: [Int] = Array(repeating: 0, count: Config.shared.workspaceCount)
     private var floating: Set<WindowGroupKey> = []
+    private var floatingFrames: [WindowGroupKey: CGRect] = [:]
     var active: Int = 0
     var previousActive: Int = 0
     private var retileScheduled = false
@@ -61,7 +62,7 @@ package final class Monitor {
             PerformanceTelemetry.traceSubspan("hide") {
                 PerformanceTelemetry.measure(.hideWorkspace) {
                     for win in workspaces[previous] {
-                        win.hideOffscreen(offscreenContext)
+                        hideOffscreen(win)
                     }
                 }
             }
@@ -89,7 +90,7 @@ package final class Monitor {
             suppressGeometryNotifications()
             PerformanceTelemetry.measure(.hideWorkspace) {
                 for win in workspaces[previous] {
-                    win.hideOffscreen(offscreenContext)
+                    hideOffscreen(win)
                 }
             }
         }
@@ -116,7 +117,7 @@ package final class Monitor {
         workspaces[index].insert(moved, at: 0)
 
         retile(validate: false)
-        moved.hideOffscreen(offscreenContext)
+        hideOffscreen(moved)
         WindowManager.invalidateAppliedGeometry(moved)
 
         let next = workspaces[active].first(where: { $0.pid == moved.pid }) ?? workspaces[active].first
@@ -168,7 +169,7 @@ package final class Monitor {
         if target == active {
             scheduleRetile()
         } else if !WorkspaceManager.shared.isTilingPaused {
-            window.hideOffscreen(offscreenContext)
+            hideOffscreen(window)
             WindowManager.invalidateAppliedGeometry(window)
         }
         return .inserted
@@ -188,7 +189,7 @@ package final class Monitor {
         guard updateExistingWindow(window) == .missing else { return }
         workspaces[target].insert(window, at: 0)
         if target != active, !WorkspaceManager.shared.isTilingPaused {
-            window.hideOffscreen(offscreenContext)
+            hideOffscreen(window)
             WindowManager.invalidateAppliedGeometry(window)
         }
     }
@@ -305,9 +306,18 @@ package final class Monitor {
     func setFloating(_ window: TrackedWindow, _ isFloating: Bool) {
         if isFloating {
             floating.insert(window.group)
+            rememberFloatingFrame(window)
         } else {
             floating.remove(window.group)
+            floatingFrames.removeValue(forKey: window.group)
         }
+    }
+
+    func rememberFloatingFrame(_ window: TrackedWindow) {
+        guard isFloating(window), let ax = window.getFrame() else { return }
+        let frame = ScreenGeometry.convertRect(ax, screens: WindowManager.screenDescriptors())
+        guard frame.intersects(tileFrame.insetBy(dx: -40, dy: -40)) else { return }
+        floatingFrames[window.group] = ax
     }
 
     var focusedWindowIsFloating: Bool {
@@ -321,10 +331,9 @@ package final class Monitor {
             let index = workspaces[active].firstIndex(of: focused)
         else { return }
         let window = workspaces[active][index]
-        if floating.contains(window.group) {
-            floating.remove(window.group)
-        } else {
-            floating.insert(window.group)
+        let next = !isFloating(window)
+        setFloating(window, next)
+        if next {
             window.raise()
         }
         retile(validate: false)
@@ -384,6 +393,11 @@ package final class Monitor {
             for i in tiled.indices {
                 tiled[i].setFrame(frames[i])
             }
+            for window in workspaces[active] where isFloating(window) {
+                if let frame = floatingFrames[window.group] {
+                    window.setFrame(frame)
+                }
+            }
             for i in tiled.indices {
                 scheduleWindowSettle(
                     window: tiled[i],
@@ -423,7 +437,7 @@ package final class Monitor {
         ) {
             for window in workspaces[workspaceIndex] {
                 WindowManager.invalidateAppliedGeometry(window)
-                window.hideOffscreen(offscreenContext)
+                hideOffscreen(window)
             }
         }
     }
@@ -552,6 +566,12 @@ package final class Monitor {
     private func pruneFloating() {
         let keys = Set(workspaces.joined().map(\.group))
         floating = floating.intersection(keys)
+        floatingFrames = floatingFrames.filter { keys.contains($0.key) }
+    }
+
+    private func hideOffscreen(_ window: TrackedWindow) {
+        rememberFloatingFrame(window)
+        window.hideOffscreen(offscreenContext)
     }
 
     private func placedWindowFrames(windowCount: Int) -> [CGRect] {

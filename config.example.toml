@@ -39,6 +39,8 @@
 # toggle_floating = "f"
 # toggle_bar = "b"
 # spawn_terminal = "shift+return"
+# decrease_master = "h"
+# increase_master = "l"
 # focus_monitor_prev = "comma"
 # focus_monitor_next = "period"
 # move_monitor_prev = "shift+comma"
@@ -49,3 +51,18 @@
 # [[custom]]
 # key = "shift+space"
 # command = "open -n -a Safari"
+
+# new windows matching app name or bundle id
+# workspace is 1-10; float keeps the window out of the tile layout
+# [[rules]]
+# app = "Finder"
+# float = true
+#
+# [[rules]]
+# app = "Safari"
+# workspace = 2
+#
+# [[rules]]
+# app = "com.apple.calculator"
+# float = true
+# workspace = 9

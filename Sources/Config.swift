@@ -144,6 +144,25 @@ package enum Key {
     }
 }
 
+package struct AppRule: Equatable {
+    package let app: String
+    package let workspace: Int?
+    package let float: Bool
+
+    package var workspaceIndex: Int? {
+        guard let workspace else { return nil }
+        return workspace - 1
+    }
+
+    package func matches(name: String?, bundle: String?, executable: String?) -> Bool {
+        let needle = app.lowercased()
+        if let name, name.lowercased() == needle { return true }
+        if let bundle, bundle.lowercased() == needle { return true }
+        if let executable, executable.lowercased() == needle { return true }
+        return false
+    }
+}
+
 package struct BuiltinBindings {
     var focusNext: (key: UInt16, shift: Bool) = (Key.j, false)
     var focusPrev: (key: UInt16, shift: Bool) = (Key.k, false)
@@ -152,6 +171,8 @@ package struct BuiltinBindings {
     var toggleFloating: (key: UInt16, shift: Bool) = (Key.f, false)
     var toggleBar: (key: UInt16, shift: Bool) = (Key.b, false)
     var spawnTerminal: (key: UInt16, shift: Bool) = (Key.return, true)
+    var decreaseMaster: (key: UInt16, shift: Bool) = (Key.h, false)
+    var increaseMaster: (key: UInt16, shift: Bool) = (Key.l, false)
     var focusMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, false)
     var focusMonitorNext: (key: UInt16, shift: Bool) = (Key.period, false)
     var moveMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, true)
@@ -162,6 +183,9 @@ package struct BuiltinBindings {
 package struct Config {
     package static let defaultWorkspaceCount = 10
     package static let defaultMasterRatio: CGFloat = 0.55
+    package static let masterRatioStep: CGFloat = 0.05
+    package static let minMasterRatio: CGFloat = 0.1
+    package static let maxMasterRatio: CGFloat = 0.9
     @MainActor
     package static var shared = Config()
     package static var path: String {
@@ -180,7 +204,19 @@ package struct Config {
     package var menuBarIcon = true
     package var barFont: BarFont = .menubar
     package var customBindings: [Binding] = []
+    package var rules: [AppRule] = []
     package var bindings = BuiltinBindings()
+
+    package func rule(for pid: pid_t) -> AppRule? {
+        let app = NSRunningApplication(processIdentifier: pid)
+        return rules.first {
+            $0.matches(
+                name: app?.localizedName,
+                bundle: app?.bundleIdentifier,
+                executable: app?.executableURL?.deletingPathExtension().lastPathComponent
+            )
+        }
+    }
 
     package private(set) var numberKeys: [UInt16: Int] = buildNumberKeys(count: defaultWorkspaceCount)
 
@@ -269,6 +305,8 @@ package struct Config {
             applyBinding(bindings, "toggle_floating", to: &config.bindings.toggleFloating, report: report)
             applyBinding(bindings, "toggle_bar", to: &config.bindings.toggleBar, report: report)
             applyBinding(bindings, "spawn_terminal", to: &config.bindings.spawnTerminal, report: report)
+            applyBinding(bindings, "decrease_master", to: &config.bindings.decreaseMaster, report: report)
+            applyBinding(bindings, "increase_master", to: &config.bindings.increaseMaster, report: report)
             applyBinding(bindings, "focus_monitor_prev", to: &config.bindings.focusMonitorPrev, report: report)
             applyBinding(bindings, "focus_monitor_next", to: &config.bindings.focusMonitorNext, report: report)
             applyBinding(bindings, "move_monitor_prev", to: &config.bindings.moveMonitorPrev, report: report)
@@ -287,6 +325,12 @@ package struct Config {
                     return nil
                 }
                 return Binding(key: code, shift: shift, command: command)
+            }
+        }
+
+        if let rows = toml["rules"] as? [[String: Any]] {
+            config.rules = rows.compactMap { row in
+                parseRule(row, workspaceCount: config.workspaceCount, report: report)
             }
         }
 
@@ -338,6 +382,16 @@ package struct Config {
         StatusBar.shared.refresh()
     }
 
+    @MainActor
+    package static func adjustMasterRatio(_ delta: CGFloat) {
+        let stepped = ((shared.masterRatio + delta) * 100).rounded() / 100
+        let next = min(max(stepped, minMasterRatio), maxMasterRatio)
+        guard abs(next - shared.masterRatio) > 0.0001 else { return }
+        shared.masterRatio = next
+        upsertNumber("master_ratio", next)
+        WorkspaceManager.shared.retileNow()
+    }
+
     private static func upsertBool(_ key: String, _ value: Bool) {
         let manager = FileManager.default
         let directory = url.deletingLastPathComponent()
@@ -347,6 +401,30 @@ package struct Config {
         var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
         let line = "\(key) = \(value ? "true" : "false")"
         let pattern = "^\(NSRegularExpression.escapedPattern(for: key))\\s*=\\s*(true|false)"
+        if let regex = try? NSRegularExpression(pattern: pattern, options: .anchorsMatchLines),
+            regex.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil
+        {
+            text = regex.stringByReplacingMatches(
+                in: text,
+                options: [],
+                range: NSRange(text.startIndex..., in: text),
+                withTemplate: line
+            )
+        } else {
+            text = line + "\n" + text
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func upsertNumber(_ key: String, _ value: CGFloat) {
+        let manager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        if !manager.fileExists(atPath: directory.path) {
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
+        let line = "\(key) = \(String(format: "%.2f", value))"
+        let pattern = "^\(NSRegularExpression.escapedPattern(for: key))\\s*=\\s*[0-9.]+"
         if let regex = try? NSRegularExpression(pattern: pattern, options: .anchorsMatchLines),
             regex.firstMatch(in: text, options: [], range: NSRange(text.startIndex..., in: text)) != nil
         {
@@ -384,6 +462,36 @@ package struct Config {
             text = line + "\n" + text
         }
         try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func parseRule(
+        _ row: [String: Any],
+        workspaceCount: Int,
+        report: (String) -> Void
+    ) -> AppRule? {
+        guard let app = row["app"] as? String else {
+            report("rule missing app")
+            return nil
+        }
+        let name = app.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else {
+            report("rule missing app")
+            return nil
+        }
+        var workspace: Int?
+        if let value = row["workspace"] as? Int {
+            if WorkspaceBounds.isValidIndex(value - 1, count: workspaceCount) {
+                workspace = value
+            } else {
+                report("rule workspace \(value) out of range for '\(name)'")
+            }
+        }
+        let float = row["float"] as? Bool ?? false
+        guard workspace != nil || float else {
+            report("rule for '\(name)' needs workspace or float")
+            return nil
+        }
+        return AppRule(app: name, workspace: workspace, float: float)
     }
 
     private static func parseKeyString(_ s: String) -> (key: UInt16?, shift: Bool) {
@@ -427,6 +535,8 @@ package struct Config {
         toggle_floating = "f"
         toggle_bar = "b"
         spawn_terminal = "shift+return"
+        decrease_master = "h"
+        increase_master = "l"
         focus_monitor_prev = "comma"
         focus_monitor_next = "period"
         move_monitor_prev = "shift+comma"

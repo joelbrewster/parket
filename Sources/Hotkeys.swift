@@ -214,6 +214,10 @@ package final class Hotkeys {
             Config.setChrome(bar: !Config.shared.bar, allowHidden: true)
         case .spawnTerminal:
             TerminalLauncher.spawn()
+        case .decreaseMaster:
+            Config.adjustMasterRatio(-Config.masterRatioStep)
+        case .increaseMaster:
+            Config.adjustMasterRatio(Config.masterRatioStep)
         case .customCommand(_, let command):
             run(command)
         }

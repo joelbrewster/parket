@@ -106,6 +106,10 @@ package final class WorkspaceManager {
         }
         let target = placementTarget(for: window.pid)
         let monitor = monitors.indices.contains(target.monitorIndex) ? monitors[target.monitorIndex] : focusedMonitor
+        let rule = Config.shared.rule(for: window.pid)
+        if rule?.float == true {
+            monitor.setFloating(window, true)
+        }
         let result = monitor.addWindow(window, workspaceIndex: target.workspaceIndex)
         if result == .inserted {
             refreshWindowRegistry(pid: window.pid)
@@ -340,6 +344,11 @@ package final class WorkspaceManager {
         windowRegistry.upsert(window, at: location)
         WindowManager.invalidateAppliedGeometry(window)
         guard monitor.active == location.workspaceIndex else { return }
+        if monitor.isFloating(window) {
+            monitor.rememberFloatingFrame(window)
+            FocusBorder.shared.update()
+            return
+        }
         monitor.scheduleCorrectiveRetile()
     }
 
@@ -705,6 +714,12 @@ package final class WorkspaceManager {
             monitorIndex: focusedMonitorIndex,
             workspaceIndex: focusedMonitor.active
         )
+        if let workspaceIndex = Config.shared.rule(for: pid)?.workspaceIndex {
+            return WorkspacePlacementTarget(
+                monitorIndex: focusedMonitorIndex,
+                workspaceIndex: workspaceIndex
+            )
+        }
         return NewWindowPlacement.target(existingAppWindows: appWindowTargets(pid: pid), current: current)
     }
 

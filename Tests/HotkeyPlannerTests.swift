@@ -97,6 +97,8 @@ struct HotkeyPlannerTests {
 
         #expect(plan.registrations.contains { $0.chord.key == Key.b && !$0.chord.shift && $0.action == .toggleBar })
         #expect(plan.registrations.contains { $0.chord.key == Key.f && !$0.chord.shift && $0.action == .toggleFloating })
+        #expect(plan.registrations.contains { $0.chord.key == Key.h && !$0.chord.shift && $0.action == .decreaseMaster })
+        #expect(plan.registrations.contains { $0.chord.key == Key.l && !$0.chord.shift && $0.action == .increaseMaster })
         #expect(
             plan.registrations.contains {
                 $0.chord.key == Key.return && $0.chord.shift && $0.action == .spawnTerminal

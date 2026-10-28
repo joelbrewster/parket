@@ -9,7 +9,7 @@ CODESIGN_REQUIREMENTS ?= =designated => identifier "$(BUNDLE_ID)"
 SYNC_DIR = $(HOME)/Sync
 SYNC_BUNDLE = $(SYNC_DIR)/$(BUNDLE)
 
-.PHONY: build test fmt lint policy check install clean dist verify-dist notarize fixture-app smoke-local focus-local close-focus-local perf-local latency-local coverage perf benchmark sync
+.PHONY: build test fmt lint policy check install rebuild clean dist verify-dist notarize fixture-app smoke-local focus-local close-focus-local perf-local latency-local coverage perf benchmark sync
 
 build:
 	swift build --product parket -c release --arch arm64 --arch x86_64
@@ -38,6 +38,9 @@ install: build
 	cp $(BUILD_DIR)/$(APP_NAME) $(INSTALL_DIR)/Contents/MacOS/
 	codesign --force --sign "$(CODESIGN_IDENTITY)" --requirements '$(CODESIGN_REQUIREMENTS)' $(INSTALL_DIR)
 	@echo "updated $(INSTALL_DIR)"
+
+rebuild:
+	bash scripts/rebuild.sh
 
 dist: build
 	rm -rf $(BUNDLE)

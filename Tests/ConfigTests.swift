@@ -110,4 +110,60 @@ struct ConfigTests {
         #expect(config.masterRatio == Config.defaultMasterRatio)
         #expect(config.customBindings.isEmpty)
     }
+
+    @Test func appRulesParseWorkspaceAndFloat() throws {
+        let config = try #require(
+            Config.parse(
+                """
+                [[rules]]
+                app = "Finder"
+                float = true
+
+                [[rules]]
+                app = "Safari"
+                workspace = 2
+
+                [[rules]]
+                app = "com.apple.calculator"
+                float = true
+                workspace = 9
+                """
+            )
+        )
+
+        #expect(config.rules.count == 3)
+        #expect(config.rules[0] == AppRule(app: "Finder", workspace: nil, float: true))
+        #expect(config.rules[1] == AppRule(app: "Safari", workspace: 2, float: false))
+        #expect(config.rules[2] == AppRule(app: "com.apple.calculator", workspace: 9, float: true))
+        #expect(config.rules[1].workspaceIndex == 1)
+    }
+
+    @Test func appRulesSkipEmptyAndOutOfRange() throws {
+        let config = try #require(
+            Config.parse(
+                """
+                [[rules]]
+                app = "Safari"
+                workspace = 12
+
+                [[rules]]
+                app = "Notes"
+
+                [[rules]]
+                app = "Mail"
+                workspace = 1
+                """
+            )
+        )
+
+        #expect(config.rules == [AppRule(app: "Mail", workspace: 1, float: false)])
+    }
+
+    @Test func appRuleMatchesNameBundleAndExecutable() {
+        let rule = AppRule(app: "Safari", workspace: 2, float: false)
+        #expect(rule.matches(name: "Safari", bundle: "com.apple.Safari", executable: "Safari"))
+        #expect(rule.matches(name: "safari", bundle: nil, executable: nil))
+        #expect(rule.matches(name: nil, bundle: "Safari", executable: nil))
+        #expect(!rule.matches(name: "Mail", bundle: "com.apple.mail", executable: "Mail"))
+    }
 }

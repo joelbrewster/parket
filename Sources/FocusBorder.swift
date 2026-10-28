@@ -1,7 +1,7 @@
 import AppKit
 
 package enum FocusBorderLayout {
-    package static let width: CGFloat = 2
+    package static let width: CGFloat = 4
 
     package static func windowFrame(from tile: CGRect) -> CGRect {
         tile.insetBy(dx: width, dy: width)
@@ -16,24 +16,33 @@ package enum FocusBorderLayout {
 package final class FocusBorder {
     package static let shared = FocusBorder()
 
-    private var panel: FocusBorderPanel?
+    private var fill: FocusBorderPanel?
+    private var outline: FocusBorderPanel?
 
     private init() {}
 
     package func update() {
         guard let frame = targetFrame() else {
-            panel?.orderOut(nil)
+            fill?.orderOut(nil)
+            outline?.orderOut(nil)
             return
         }
-        let border = panel ?? FocusBorderPanel()
-        panel = border
-        border.place(frame)
-        border.orderBack(nil)
+        let fillPanel = fill ?? FocusBorderPanel(role: .fill)
+        let outlinePanel = outline ?? FocusBorderPanel(role: .outline)
+        fill = fillPanel
+        outline = outlinePanel
+        fillPanel.place(frame)
+        outlinePanel.place(frame)
+        fillPanel.orderBack(nil)
+        outlinePanel.orderFront(nil)
     }
 
     package func applyAppearance() {
-        panel?.appearance = MenuBarChrome.appearance
-        panel?.contentView?.needsDisplay = true
+        let appearance = MenuBarChrome.appearance
+        for panel in [fill, outline] {
+            panel?.appearance = appearance
+            panel?.contentView?.needsDisplay = true
+        }
     }
 
     private func targetFrame() -> CGRect? {
@@ -71,8 +80,13 @@ package final class FocusBorder {
     }
 }
 
+private enum FocusBorderRole {
+    case fill
+    case outline
+}
+
 private final class FocusBorderPanel: NSPanel {
-    init() {
+    init(role: FocusBorderRole) {
         super.init(
             contentRect: .zero,
             styleMask: [.borderless, .nonactivatingPanel],
@@ -87,13 +101,15 @@ private final class FocusBorderPanel: NSPanel {
         hasShadow = false
         isOpaque = false
         ignoresMouseEvents = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue - 1)
+        let base = NSWindow.Level.normal.rawValue
+        level = NSWindow.Level(rawValue: role == .fill ? base - 1 : base + 1)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
+        appearance = MenuBarChrome.appearance
         backgroundColor = .clear
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
-        contentView = FocusBorderView()
+        contentView = FocusBorderView(role: role)
     }
 
     override var canBecomeKey: Bool { false }
@@ -106,8 +122,11 @@ private final class FocusBorderPanel: NSPanel {
 }
 
 private final class FocusBorderView: NSView {
-    override init(frame frameRect: NSRect) {
-        super.init(frame: frameRect)
+    private let role: FocusBorderRole
+
+    init(role: FocusBorderRole) {
+        self.role = role
+        super.init(frame: .zero)
         wantsLayer = true
         layerContentsRedrawPolicy = .onSetNeedsDisplay
     }
@@ -119,11 +138,15 @@ private final class FocusBorderView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         let color = NSColor.controlAccentColor
-        guard let gradient = NSGradient(starting: color, ending: color.withAlphaComponent(0)) else {
+        switch role {
+        case .fill:
             color.setFill()
             bounds.fill()
-            return
+        case .outline:
+            color.withAlphaComponent(0.55).setStroke()
+            let path = NSBezierPath(rect: bounds.insetBy(dx: 0.5, dy: 0.5))
+            path.lineWidth = 6
+            path.stroke()
         }
-        gradient.draw(in: bounds, angle: -90)
     }
 }

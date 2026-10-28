@@ -11,6 +11,8 @@ package enum HotkeyAction: Equatable {
     case toggleFloating
     case toggleBar
     case spawnTerminal
+    case decreaseMaster
+    case increaseMaster
     case customCommand(index: Int, command: String)
 
     package var diagnosticLabel: String {
@@ -39,6 +41,10 @@ package enum HotkeyAction: Equatable {
             return "toggle_bar"
         case .spawnTerminal:
             return "spawn_terminal"
+        case .decreaseMaster:
+            return "decrease_master"
+        case .increaseMaster:
+            return "increase_master"
         case .customCommand(let index, _):
             return "custom#\(index)"
         }
@@ -70,6 +76,10 @@ package enum HotkeyAction: Equatable {
             return "toggle_bar"
         case .spawnTerminal:
             return "spawn_terminal"
+        case .decreaseMaster:
+            return "decrease_master"
+        case .increaseMaster:
+            return "increase_master"
         case .customCommand:
             return "custom_command"
         }
@@ -207,6 +217,8 @@ package enum HotkeyPlanner {
         add(key: bindings.toggleFloating.key, shift: bindings.toggleFloating.shift, action: .toggleFloating)
         add(key: bindings.toggleBar.key, shift: bindings.toggleBar.shift, action: .toggleBar)
         add(key: bindings.spawnTerminal.key, shift: bindings.spawnTerminal.shift, action: .spawnTerminal)
+        add(key: bindings.decreaseMaster.key, shift: bindings.decreaseMaster.shift, action: .decreaseMaster)
+        add(key: bindings.increaseMaster.key, shift: bindings.increaseMaster.shift, action: .increaseMaster)
         add(key: bindings.focusMonitorPrev.key, shift: bindings.focusMonitorPrev.shift, action: .focusMonitor(-1))
         add(key: bindings.focusMonitorNext.key, shift: bindings.focusMonitorNext.shift, action: .focusMonitor(1))
         add(key: bindings.moveMonitorPrev.key, shift: bindings.moveMonitorPrev.shift, action: .moveWindowToMonitor(-1))
