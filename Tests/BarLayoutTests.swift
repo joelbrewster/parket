@@ -21,9 +21,9 @@ struct BarLayoutTests {
         let visible = CGRect(x: 0, y: 25, width: 1440, height: 823)
         let tiled = BarLayout.tileFrame(screenFrame: screen, visibleFrame: visible)
 
-        #expect(tiled.origin.y == BarLayout.height + BarLayout.gap)
+        #expect(tiled.origin.y == BarLayout.overlayHeight(menuBar: 25) + BarLayout.gap)
         #expect(tiled.maxY == visible.maxY)
-        #expect(tiled.height == visible.maxY - BarLayout.height - BarLayout.gap)
+        #expect(tiled.height == visible.maxY - BarLayout.overlayHeight(menuBar: 25) - BarLayout.gap)
     }
 
     @Test func tileFrameFollowsTallerMenuBar() {
@@ -31,7 +31,7 @@ struct BarLayoutTests {
         let visible = CGRect(x: 0, y: 37, width: 1440, height: 811)
         let tiled = BarLayout.tileFrame(screenFrame: screen, visibleFrame: visible)
 
-        #expect(tiled.origin.y == 37 + BarLayout.gap)
+        #expect(tiled.origin.y == BarLayout.overlayHeight(menuBar: 37) + BarLayout.gap)
         #expect(tiled.maxY == visible.maxY)
     }
 
@@ -46,7 +46,7 @@ struct BarLayoutTests {
     }
 
     @Test func reservedTopIsBarPlusTinyGap() {
-        #expect(BarLayout.reservedTop == BarLayout.height + BarLayout.gap)
-        #expect(BarLayout.gap == 2)
+        #expect(BarLayout.reservedTop == BarLayout.height + BarLayout.topPad + BarLayout.gap)
+        #expect(BarLayout.gap == 0)
     }
 }

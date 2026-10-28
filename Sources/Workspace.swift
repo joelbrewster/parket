@@ -550,8 +550,19 @@ package final class WorkspaceManager {
 
     package func applyCurrentConfig() {
         let count = Config.shared.workspaceCount
+        let screens = NSScreen.screens
+        let snapshot = WindowManager.screenSnapshot(for: screens)
         for monitor in monitors {
             monitor.resizeWorkspaces(to: count)
+            if let geometry = snapshot.screen(displayID: monitor.displayID) {
+                monitor.tileFrame = Config.shared.bar
+                    ? BarLayout.tileFrame(
+                        screenFrame: geometry.frame,
+                        visibleFrame: geometry.visibleFrame,
+                        gap: Config.shared.barGap
+                    )
+                    : geometry.visibleFrame
+            }
             if !isTilingPaused {
                 monitor.retile(validate: true)
             }
@@ -615,7 +626,8 @@ package final class WorkspaceManager {
                     tileFrame: Config.shared.bar
                         ? BarLayout.tileFrame(
                             screenFrame: geometry.frame,
-                            visibleFrame: geometry.visibleFrame
+                            visibleFrame: geometry.visibleFrame,
+                            gap: Config.shared.barGap
                         )
                         : geometry.visibleFrame,
                     offscreenContext: OffscreenWindowPlacementContext(

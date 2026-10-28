@@ -18,7 +18,7 @@ package final class Monitor {
 
     let displayID: CGDirectDisplayID
     var screen: NSScreen
-    let tileFrame: CGRect
+    var tileFrame: CGRect
     private let offscreenContext: OffscreenWindowPlacementContext
     var workspaces: [[TrackedWindow]] = Array(repeating: [], count: Config.shared.workspaceCount)
     var layouts: [Layout] = Array(repeating: .tile, count: Config.shared.workspaceCount)

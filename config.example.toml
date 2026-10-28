@@ -26,6 +26,9 @@
 # global modifier key: "option", "control", "command"
 # modifier = "option"
 
+# extra space under the bar before windows
+# bar_gap = 0
+
 # focused window outline
 # border_width = 2
 # border_radius = 8

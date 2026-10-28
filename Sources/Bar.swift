@@ -2,11 +2,12 @@ import AppKit
 
 package enum BarLayout {
     package static let height: CGFloat = 28
-    package static let gap: CGFloat = 2
-    package static var reservedTop: CGFloat { height + gap }
+    package static let gap: CGFloat = 0
+    package static var topPad: CGFloat { 2 }
+    package static var reservedTop: CGFloat { height + topPad + gap }
 
     package static func overlayHeight(menuBar: CGFloat) -> CGFloat {
-        max(menuBar, height)
+        max(menuBar, height) + topPad
     }
 
     package static func windowFrame(for screen: NSScreen) -> CGRect {
@@ -21,7 +22,11 @@ package enum BarLayout {
         )
     }
 
-    package static func tileFrame(screenFrame: CGRect, visibleFrame: CGRect) -> CGRect {
+    package static func tileFrame(
+        screenFrame: CGRect,
+        visibleFrame: CGRect,
+        gap: CGFloat = BarLayout.gap
+    ) -> CGRect {
         let top = screenFrame.minY + overlayHeight(menuBar: visibleFrame.minY - screenFrame.minY) + gap
         return CGRect(
             x: visibleFrame.minX,
@@ -281,25 +286,32 @@ private final class BarContentView: NSView {
         MenuBarChrome.color.setFill()
         bounds.fill()
         let font = Config.shared.barFont.nsFont()
-        var x: CGFloat = 0
+        let margin = FocusBorderLayout.width
+        let topPad = BarLayout.topPad
+        let contentHeight = max(0, bounds.height - topPad)
+        let capHeight = font.capHeight > 0 ? font.capHeight : font.ascender
+        let textHeight = ceil(font.ascender - font.descender)
+        let textY = topPad + contentHeight / 2 - font.ascender + capHeight / 2
+        var x: CGFloat = margin
         hits = []
 
-        let pad = Config.shared.borderWidth
-        let tagSide = bounds.height
+        let tagSide = contentHeight
         let markSide: CGFloat = 5
         for (index, tag) in tags.enumerated() {
-            let rect = NSRect(x: x, y: 0, width: tagSide, height: tagSide)
+            let rect = NSRect(x: x, y: topPad, width: tagSide, height: tagSide)
             if tag.active {
-                fillAccent(rect.insetBy(dx: pad, dy: pad))
+                fillAccent(rect.insetBy(dx: 0, dy: margin))
             }
             drawText(
                 "\(tag.number)",
                 in: rect,
                 font: font,
-                color: tag.active ? .white : (tag.occupied ? .labelColor : .tertiaryLabelColor)
+                color: tag.active ? .white : (tag.occupied ? .labelColor : .tertiaryLabelColor),
+                textY: textY,
+                textHeight: textHeight
             )
             if tag.occupied && !tag.active {
-                let mark = NSRect(x: rect.minX + 3, y: 3, width: markSide, height: markSide)
+                let mark = NSRect(x: rect.minX + 3, y: topPad + 3, width: markSide, height: markSide)
                 NSColor.labelColor.setFill()
                 mark.fill()
             }
@@ -308,45 +320,47 @@ private final class BarContentView: NSView {
         }
 
         let symbol = floating ? "><>" : (layout == .monocle ? "[M]" : "[]=")
-        let layoutRect = NSRect(x: x, y: 0, width: cellWidth(symbol, font: font), height: bounds.height)
-        drawText(symbol, in: layoutRect, font: font, color: .labelColor)
+        let layoutRect = NSRect(x: x, y: topPad, width: cellWidth(symbol, font: font), height: contentHeight)
+        drawText(symbol, in: layoutRect, font: font, color: .labelColor, textY: textY, textHeight: textHeight)
         hits.append((.layout, layoutRect))
         x = layoutRect.maxX
 
         if windowCount > 0 {
-            let countRect = NSRect(x: x, y: 0, width: cellWidth("\(windowCount)", font: font), height: bounds.height)
-            drawText("\(windowCount)", in: countRect, font: font, color: .secondaryLabelColor)
+            let countRect = NSRect(x: x, y: topPad, width: cellWidth("\(windowCount)", font: font), height: contentHeight)
+            drawText("\(windowCount)", in: countRect, font: font, color: .secondaryLabelColor, textY: textY, textHeight: textHeight)
             x = countRect.maxX
         }
 
         let clockWidth = textSize(clock, font: font).width + 24
         let clockRect = NSRect(
             x: bounds.maxX - clockWidth,
-            y: 0,
+            y: topPad,
             width: clockWidth,
-            height: bounds.height
+            height: contentHeight
         )
-        drawText(clock, in: clockRect, font: font, color: .secondaryLabelColor, truncate: true)
+        drawText(clock, in: clockRect, font: font, color: .secondaryLabelColor, truncate: true, textY: textY, textHeight: textHeight)
 
         let titleMargin: CGFloat = 8
         let titlePadding: CGFloat = 10
         let titleSlot = max(0, clockRect.minX - x)
-        let accentRect = NSRect(
+        let titleRect = NSRect(
             x: x + titleMargin,
-            y: pad,
+            y: topPad,
             width: max(0, titleSlot - titleMargin * 2),
-            height: max(0, bounds.height - pad * 2)
+            height: contentHeight
         )
         if titleHighlighted && !titleText.isEmpty {
-            fillAccent(accentRect)
+            fillAccent(titleRect.insetBy(dx: 0, dy: margin))
         }
         drawText(
             titleText,
-            in: accentRect,
+            in: titleRect,
             font: font,
             color: titleHighlighted && !titleText.isEmpty ? .white : .labelColor,
             truncate: true,
-            padding: titlePadding
+            padding: titlePadding,
+            textY: textY,
+            textHeight: textHeight
         )
     }
 
@@ -393,29 +407,24 @@ private final class BarContentView: NSView {
         font: NSFont,
         color: NSColor,
         truncate: Bool = false,
-        padding: CGFloat = 8
+        padding: CGFloat = 8,
+        textY: CGFloat,
+        textHeight: CGFloat
     ) {
         let paragraph = NSMutableParagraphStyle()
         paragraph.alignment = .center
         paragraph.lineBreakMode = truncate ? .byTruncatingTail : .byClipping
         if truncate { paragraph.alignment = .left }
         let inset = truncate ? padding : 0
-        let drawRect = NSRect(
-            x: rect.minX + inset,
-            y: rect.minY,
-            width: max(0, rect.width - inset * 2),
-            height: rect.height
-        )
         let attr = NSAttributedString(
             string: text,
             attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph]
         )
-        let size = attr.size()
         let textRect = NSRect(
-            x: drawRect.minX,
-            y: drawRect.minY + (drawRect.height - size.height) / 2,
-            width: drawRect.width,
-            height: size.height
+            x: rect.minX + inset,
+            y: textY,
+            width: max(0, rect.width - inset * 2),
+            height: textHeight
         )
         attr.draw(with: textRect, options: [.usesLineFragmentOrigin])
     }

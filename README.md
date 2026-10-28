@@ -76,6 +76,7 @@ focus_follows_mouse = false    # true focuses the window the pointer moves onto
 bar = true                     # false hides the overlay bar; right-click the bar or menu extra
 menu_bar_icon = true           # false hides the menu bar extra
 bar_font = "menubar"           # "menubar" or "mono" (Yakshaven)
+bar_gap = 0                    # extra space under the bar
 border_width = 2
 border_radius = 8
 

@@ -204,6 +204,7 @@ package struct Config {
     package var bar = true
     package var menuBarIcon = true
     package var barFont: BarFont = .menubar
+    package var barGap: CGFloat = 0
     package var borderWidth: CGFloat = 2
     package var borderRadius: CGFloat = 8
     package var customBindings: [Binding] = []
@@ -270,6 +271,10 @@ package struct Config {
 
         if let followsMouse = toml["focus_follows_mouse"] as? Bool {
             config.focusFollowsMouse = followsMouse
+        }
+
+        if let gap = cgFloat(toml["bar_gap"]), gap >= 0, gap <= 64 {
+            config.barGap = gap
         }
 
         if let width = cgFloat(toml["border_width"]), width > 0, width <= 32 {
@@ -548,6 +553,7 @@ package struct Config {
         bar = true
         menu_bar_icon = true
         bar_font = "menubar"
+        bar_gap = 0
         border_width = 2
         border_radius = 8
 
