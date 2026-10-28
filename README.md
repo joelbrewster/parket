@@ -42,6 +42,7 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + Return` | Swap focused window with master |
 | `Option + Tab` | Switch to last active workspace |
 | `Option + M` | Toggle monocle layout |
+| `Option + F` | Toggle floating on the focused window |
 | `Option + B` | Show or hide the top bar |
 | `Option + Shift + Return` | Spawn a new window of the default terminal |
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
@@ -78,6 +79,7 @@ focus_next = "j"
 focus_prev = "k"
 swap_master = "return"
 toggle_layout = "m"
+toggle_floating = "f"
 toggle_bar = "b"
 spawn_terminal = "shift+return"
 last_workspace = "tab"

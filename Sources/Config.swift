@@ -149,6 +149,7 @@ package struct BuiltinBindings {
     var focusPrev: (key: UInt16, shift: Bool) = (Key.k, false)
     var swapMaster: (key: UInt16, shift: Bool) = (Key.return, false)
     var toggleLayout: (key: UInt16, shift: Bool) = (Key.m, false)
+    var toggleFloating: (key: UInt16, shift: Bool) = (Key.f, false)
     var toggleBar: (key: UInt16, shift: Bool) = (Key.b, false)
     var spawnTerminal: (key: UInt16, shift: Bool) = (Key.return, true)
     var focusMonitorPrev: (key: UInt16, shift: Bool) = (Key.comma, false)
@@ -265,6 +266,7 @@ package struct Config {
             applyBinding(bindings, "focus_prev", to: &config.bindings.focusPrev, report: report)
             applyBinding(bindings, "swap_master", to: &config.bindings.swapMaster, report: report)
             applyBinding(bindings, "toggle_layout", to: &config.bindings.toggleLayout, report: report)
+            applyBinding(bindings, "toggle_floating", to: &config.bindings.toggleFloating, report: report)
             applyBinding(bindings, "toggle_bar", to: &config.bindings.toggleBar, report: report)
             applyBinding(bindings, "spawn_terminal", to: &config.bindings.spawnTerminal, report: report)
             applyBinding(bindings, "focus_monitor_prev", to: &config.bindings.focusMonitorPrev, report: report)
@@ -422,6 +424,7 @@ package struct Config {
         focus_prev = "k"
         swap_master = "return"
         toggle_layout = "m"
+        toggle_floating = "f"
         toggle_bar = "b"
         spawn_terminal = "shift+return"
         focus_monitor_prev = "comma"

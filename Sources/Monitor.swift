@@ -23,6 +23,7 @@ package final class Monitor {
     var workspaces: [[TrackedWindow]] = Array(repeating: [], count: Config.shared.workspaceCount)
     var layouts: [Layout] = Array(repeating: .tile, count: Config.shared.workspaceCount)
     var focusedIndices: [Int] = Array(repeating: 0, count: Config.shared.workspaceCount)
+    private var floating: Set<WindowGroupKey> = []
     var active: Int = 0
     var previousActive: Int = 0
     private var retileScheduled = false
@@ -128,16 +129,22 @@ package final class Monitor {
     func tiledWindow(at point: CGPoint) -> TrackedWindow? {
         guard tileFrame.contains(point), workspaces.indices.contains(active) else { return nil }
         let windows = workspaces[active]
+        for window in windows where isFloating(window) {
+            if let frame = window.getFrame(), frame.contains(point) {
+                return window
+            }
+        }
+        let tiled = windows.filter { !isFloating($0) }
         if layouts[active] == .monocle {
-            return windows.indices.contains(focusedIndices[active]) ? windows[focusedIndices[active]] : windows.first
+            return tiled.indices.contains(focusedIndices[active]) ? tiled[focusedIndices[active]] : tiled.first
         }
         let frames = Tiler.calculateFrames(
-            count: windows.count,
+            count: tiled.count,
             screen: tileFrame,
             layout: layouts[active],
             masterRatio: Config.shared.masterRatio
         )
-        return zip(windows, frames).first { $0.1.contains(point) }?.0
+        return zip(tiled, frames).first { $0.1.contains(point) }?.0
     }
 
     @discardableResult
@@ -291,6 +298,38 @@ package final class Monitor {
         }
     }
 
+    func isFloating(_ window: TrackedWindow) -> Bool {
+        floating.contains(window.group)
+    }
+
+    func setFloating(_ window: TrackedWindow, _ isFloating: Bool) {
+        if isFloating {
+            floating.insert(window.group)
+        } else {
+            floating.remove(window.group)
+        }
+    }
+
+    var focusedWindowIsFloating: Bool {
+        guard let focused = WindowManager.focusedWindow() else { return false }
+        return workspaces[active].contains(focused) && isFloating(focused)
+    }
+
+    func toggleFloating() {
+        guard !WorkspaceManager.shared.isTilingPaused else { return }
+        guard let focused = WindowManager.focusedWindow(),
+            let index = workspaces[active].firstIndex(of: focused)
+        else { return }
+        let window = workspaces[active][index]
+        if floating.contains(window.group) {
+            floating.remove(window.group)
+        } else {
+            floating.insert(window.group)
+            window.raise()
+        }
+        retile(validate: false)
+    }
+
     private func scheduleRetile() {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
         guard !retileScheduled else { return }
@@ -339,14 +378,15 @@ package final class Monitor {
                 invalidateActiveWorkspaceAppliedGeometry()
             }
             suppressGeometryNotifications()
-            let windows = workspaces[active]
-            let frames = placedWindowFrames(windowCount: windows.count)
-            for i in windows.indices {
-                windows[i].setFrame(frames[i])
+            pruneFloating()
+            let tiled = workspaces[active].filter { !isFloating($0) }
+            let frames = placedWindowFrames(windowCount: tiled.count)
+            for i in tiled.indices {
+                tiled[i].setFrame(frames[i])
             }
-            for i in windows.indices {
+            for i in tiled.indices {
                 scheduleWindowSettle(
-                    window: windows[i],
+                    window: tiled[i],
                     target: frames[i],
                     step: 0,
                     generation: geometryOperationGeneration,
@@ -395,6 +435,7 @@ package final class Monitor {
             windows.append(window)
         }
         workspaces[active] = windows
+        pruneFloating()
         clampFocusedIndex()
     }
 
@@ -472,9 +513,9 @@ package final class Monitor {
         guard !WorkspaceManager.shared.isTilingPaused else { return nil }
         guard WorkspaceManager.shared.monitors.contains(where: { $0 === self }) else { return nil }
         guard workspaces.indices.contains(active) else { return nil }
-        let windows = workspaces[active]
-        guard let index = windows.firstIndex(of: window) else { return nil }
-        let frames = placedWindowFrames(windowCount: windows.count)
+        let tiled = workspaces[active].filter { !isFloating($0) }
+        guard let index = tiled.firstIndex(of: window) else { return nil }
+        let frames = placedWindowFrames(windowCount: tiled.count)
         guard frames.indices.contains(index) else { return nil }
         guard framesMatch(frames[index], target, tolerance: Self.frameTolerance) else { return nil }
         guard let frame = window.getFrame() else { return nil }
@@ -496,16 +537,21 @@ package final class Monitor {
     }
 
     private func activeWorkspaceMatchesLayout(tolerance: CGFloat) -> Bool {
-        let windows = workspaces[active]
-        let frames = placedWindowFrames(windowCount: windows.count)
-        guard frames.count == windows.count else { return false }
+        let tiled = workspaces[active].filter { !isFloating($0) }
+        let frames = placedWindowFrames(windowCount: tiled.count)
+        guard frames.count == tiled.count else { return false }
 
-        for i in windows.indices {
-            guard windows[i].isTileable(), let frame = windows[i].getFrame() else { return false }
+        for i in tiled.indices {
+            guard tiled[i].isTileable(), let frame = tiled[i].getFrame() else { return false }
             guard framesMatch(frame, frames[i], tolerance: tolerance) else { return false }
         }
 
         return true
+    }
+
+    private func pruneFloating() {
+        let keys = Set(workspaces.joined().map(\.group))
+        floating = floating.intersection(keys)
     }
 
     private func placedWindowFrames(windowCount: Int) -> [CGRect] {

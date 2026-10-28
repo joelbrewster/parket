@@ -103,6 +103,7 @@ package final class Bar {
                 windowCount: windowCount(for: monitor),
                 title: title(for: monitor),
                 titleHighlighted: monitor?.displayID == focusedID,
+                floating: monitor?.focusedWindowIsFloating == true,
                 clock: clock
             )
         }
@@ -226,6 +227,7 @@ private final class BarContentView: NSView {
     private var windowCount = 0
     private var titleText = ""
     private var titleHighlighted = false
+    private var floating = false
     private var clock = ""
     private var hits: [(BarHit, NSRect)] = []
 
@@ -250,6 +252,7 @@ private final class BarContentView: NSView {
         windowCount: Int,
         title: String,
         titleHighlighted: Bool,
+        floating: Bool,
         clock: String
     ) {
         self.tags = tags
@@ -257,6 +260,7 @@ private final class BarContentView: NSView {
         self.windowCount = windowCount
         titleText = title
         self.titleHighlighted = titleHighlighted
+        self.floating = floating
         self.clock = clock
         needsDisplay = true
     }
@@ -296,7 +300,7 @@ private final class BarContentView: NSView {
             x += tagSide
         }
 
-        let symbol = layout == .monocle ? "[M]" : "[]="
+        let symbol = floating ? "><>" : (layout == .monocle ? "[M]" : "[]=")
         let layoutRect = NSRect(x: x, y: 0, width: cellWidth(symbol, font: font), height: bounds.height)
         drawText(symbol, in: layoutRect, font: font, color: .labelColor)
         hits.append((.layout, layoutRect))

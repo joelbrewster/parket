@@ -8,6 +8,7 @@ package enum HotkeyAction: Equatable {
     case focusPrev
     case swapMaster
     case toggleLayout
+    case toggleFloating
     case toggleBar
     case spawnTerminal
     case customCommand(index: Int, command: String)
@@ -32,6 +33,8 @@ package enum HotkeyAction: Equatable {
             return "swap_master"
         case .toggleLayout:
             return "toggle_layout"
+        case .toggleFloating:
+            return "toggle_floating"
         case .toggleBar:
             return "toggle_bar"
         case .spawnTerminal:
@@ -61,6 +64,8 @@ package enum HotkeyAction: Equatable {
             return "swap_master"
         case .toggleLayout:
             return "toggle_layout"
+        case .toggleFloating:
+            return "toggle_floating"
         case .toggleBar:
             return "toggle_bar"
         case .spawnTerminal:
@@ -199,6 +204,7 @@ package enum HotkeyPlanner {
         add(key: bindings.focusPrev.key, shift: bindings.focusPrev.shift, action: .focusPrev)
         add(key: bindings.swapMaster.key, shift: bindings.swapMaster.shift, action: .swapMaster)
         add(key: bindings.toggleLayout.key, shift: bindings.toggleLayout.shift, action: .toggleLayout)
+        add(key: bindings.toggleFloating.key, shift: bindings.toggleFloating.shift, action: .toggleFloating)
         add(key: bindings.toggleBar.key, shift: bindings.toggleBar.shift, action: .toggleBar)
         add(key: bindings.spawnTerminal.key, shift: bindings.spawnTerminal.shift, action: .spawnTerminal)
         add(key: bindings.focusMonitorPrev.key, shift: bindings.focusMonitorPrev.shift, action: .focusMonitor(-1))

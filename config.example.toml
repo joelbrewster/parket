@@ -36,6 +36,7 @@
 # focus_prev = "k"
 # swap_master = "return"
 # toggle_layout = "m"
+# toggle_floating = "f"
 # toggle_bar = "b"
 # spawn_terminal = "shift+return"
 # focus_monitor_prev = "comma"

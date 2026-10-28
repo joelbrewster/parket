@@ -62,6 +62,11 @@ package final class FocusBorder {
             masterRatio: Config.shared.masterRatio
         )
         guard frames.indices.contains(index) else { return nil }
+        let window = windows[index]
+        if monitor.isFloating(window), let ax = window.getFrame() {
+            let frame = ScreenGeometry.convertRect(ax, screens: WindowManager.screenDescriptors())
+            return frame.insetBy(dx: -FocusBorderLayout.width, dy: -FocusBorderLayout.width)
+        }
         return ScreenGeometry.convertRect(frames[index], screens: WindowManager.screenDescriptors())
     }
 }

@@ -236,6 +236,13 @@ package final class WorkspaceManager {
         StatusBar.shared.update()
     }
 
+    func toggleFloating() {
+        guard !isTilingPaused else { return }
+        guard !monitors.isEmpty else { return }
+        focusedMonitor.toggleFloating()
+        StatusBar.shared.update()
+    }
+
     func toggleLayout(displayID: CGDirectDisplayID) {
         guard let monitorIndex = monitors.firstIndex(where: { $0.displayID == displayID }) else { return }
         focusedMonitorIndex = monitorIndex
@@ -259,12 +266,15 @@ package final class WorkspaceManager {
         let source = focusedMonitor
         guard let i = source.workspaces[source.active].firstIndex(of: focused) else { return }
         let moved = focused.keepingMembers(from: source.workspaces[source.active][i])
+        let wasFloating = source.isFloating(moved)
         source.workspaces[source.active].remove(at: i)
+        source.setFloating(moved, false)
         source.retile(validate: false)
 
         let targetIndex = (focusedMonitorIndex + offset + monitors.count) % monitors.count
         let target = monitors[targetIndex]
         target.insertWindow(moved)
+        target.setFloating(moved, wasFloating)
         target.retile(validate: false)
 
         focusedMonitorIndex = targetIndex
