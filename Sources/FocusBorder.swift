@@ -79,7 +79,7 @@ private final class FocusBorderPanel: NSPanel {
         isOpaque = false
         ignoresMouseEvents = true
         level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 2)
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
         backgroundColor = .clear
         titleVisibility = .hidden

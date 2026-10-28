@@ -185,7 +185,7 @@ private final class BarPanel: NSPanel {
         hasShadow = false
         isOpaque = false
         level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue - 1)
-        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenAuxiliary]
+        collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
         backgroundColor = .clear
         titleVisibility = .hidden
