@@ -5,6 +5,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
     package static let shared = StatusBar()
 
     private let statusItem: NSStatusItem
+    private let menu = NSMenu()
     private let contentView = StatusContentView()
     private var lastState: StatusState?
     private let stateSummaryItem = NSMenuItem(title: "parket", action: nil, keyEquivalent: "")
@@ -36,7 +37,6 @@ package final class StatusBar: NSObject, NSMenuDelegate {
     }
 
     private func buildMenu() {
-        let menu = NSMenu()
         menu.delegate = self
         for item in [
             pauseItem,
@@ -68,7 +68,26 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         menu.addItem(copyDiagnosticsItem)
         menu.addItem(quitSeparator)
         menu.addItem(quitItem)
+    }
+
+    @objc private func statusItemClicked() {
+        guard let button = statusItem.button else { return }
+        if let event = NSApp.currentEvent, event.type == .leftMouseDown, !event.modifierFlags.contains(.control) {
+            let point = contentView.convert(event.locationInWindow, from: nil)
+            switch contentView.segment(at: point) {
+            case .badge(let number, _, _):
+                WorkspaceManager.shared.switchTo(number - 1)
+                return
+            case .layout:
+                WorkspaceManager.shared.toggleLayout()
+                return
+            default:
+                break
+            }
+        }
         statusItem.menu = menu
+        button.performClick(nil)
+        statusItem.menu = nil
     }
 
     package func menuWillOpen(_ menu: NSMenu) {
@@ -152,7 +171,7 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         }
 
         guard !ws.monitors.isEmpty else {
-            segments.append(.badge(number: 1, active: true))
+            segments.append(.badge(number: 1, active: true, occupied: false))
             applySegments(segments, fontSize: fontSize)
             return
         }
@@ -164,23 +183,18 @@ package final class StatusBar: NSObject, NSMenuDelegate {
             segments.append(.monitor(number: monitorNumber))
         }
 
-        let layout = monitor.layouts[monitor.active]
-        if layout == .monocle {
-            let windowCount = monitor.workspaces[monitor.active].count
-            segments.append(.monocle(windowCount: windowCount))
-        }
+        segments.append(
+            .layout(
+                monitor.layouts[monitor.active],
+                windowCount: monitor.workspaces[monitor.active].count,
+                masterRatio: Config.shared.masterRatio
+            )
+        )
 
         for i in 0..<Config.shared.workspaceCount {
-            let isActive = i == monitor.active
-            let hasWindows = !monitor.workspaces[i].isEmpty
-
-            guard isActive || hasWindows else { continue }
-
-            segments.append(.badge(number: i + 1, active: isActive))
-        }
-
-        if segments.isEmpty {
-            segments.append(.badge(number: 1, active: true))
+            segments.append(
+                .badge(number: i + 1, active: i == monitor.active, occupied: !monitor.workspaces[i].isEmpty)
+            )
         }
 
         applySegments(segments, fontSize: fontSize)
@@ -237,21 +251,17 @@ package final class StatusBar: NSObject, NSMenuDelegate {
 
         let monitor = ws.focusedMonitor
         let display = ws.monitors.count > 1 ? "Display \(ws.focusedMonitorIndex + 1), " : ""
-        if monitor.layouts[monitor.active] == .monocle {
-            let count = monitor.workspaces[monitor.active].count
-            return "parket: \(display)Monocle, \(count) \(Self.windowWord(count))"
-        }
-
-        return "parket: \(display)Workspace \(monitor.active + 1)"
-    }
-
-    private static func windowWord(_ count: Int) -> String {
-        count == 1 ? "window" : "windows"
+        let layout = monitor.layouts[monitor.active] == .monocle ? "Monocle" : "Tile"
+        let count = monitor.workspaces[monitor.active].count
+        return "parket: \(display)Workspace \(monitor.active + 1), \(layout), \(count) \(windowWord(count))"
     }
 
     private func installContentView() {
         guard let button = statusItem.button else { return }
         button.title = ""
+        button.target = self
+        button.action = #selector(statusItemClicked)
+        button.sendAction(on: [.leftMouseDown, .rightMouseDown])
         contentView.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(contentView)
         NSLayoutConstraint.activate([
@@ -273,6 +283,32 @@ private let badgeColor = NSColor(name: nil) { appearance in
         : NSColor(red: 26 / 255, green: 34 / 255, blue: 37 / 255, alpha: 1)
 }
 
+private func windowWord(_ count: Int) -> String {
+    count == 1 ? "window" : "windows"
+}
+
+enum TileGlyph {
+    static let maxStackSlices = 3
+    static let gap: CGFloat = 1
+
+    static func rects(windowCount: Int, masterRatio: CGFloat, in area: CGRect) -> [CGRect] {
+        guard windowCount > 0 else { return [] }
+        guard windowCount > 1 else { return [area] }
+
+        let masterWidth = floor(area.width * masterRatio - gap / 2)
+        let master = CGRect(x: area.minX, y: area.minY, width: masterWidth, height: area.height)
+        let stackX = master.maxX + gap
+        let slices = min(windowCount - 1, maxStackSlices)
+        let pitch = area.height + gap
+        let stack = (0..<slices).map { index in
+            let top = area.maxY - (pitch * CGFloat(index) / CGFloat(slices)).rounded()
+            let bottom = area.maxY - (pitch * CGFloat(index + 1) / CGFloat(slices)).rounded() + gap
+            return CGRect(x: stackX, y: bottom, width: area.maxX - stackX, height: top - bottom)
+        }
+        return [master] + stack
+    }
+}
+
 private func drawCenteredText(_ text: String, in bounds: NSRect, fontSize: CGFloat, color: NSColor, ctx: CGContext) {
     let font = NSFont.systemFont(ofSize: fontSize - 1)
     let str = NSAttributedString(string: text, attributes: [.font: font, .foregroundColor: color])
@@ -285,10 +321,10 @@ private func drawCenteredText(_ text: String, in bounds: NSRect, fontSize: CGFlo
 }
 
 private enum StatusSegment: Equatable {
-    case badge(number: Int, active: Bool)
+    case badge(number: Int, active: Bool, occupied: Bool)
     case symbol(name: String, accessibilityLabel: String)
     case monitor(number: Int)
-    case monocle(windowCount: Int)
+    case layout(Layout, windowCount: Int, masterRatio: CGFloat)
 
     func size(fontSize: CGFloat) -> CGSize {
         switch self {
@@ -300,21 +336,25 @@ private enum StatusSegment: Equatable {
             return CGSize(width: side, height: side)
         case .monitor:
             return CGSize(width: fontSize + 12, height: fontSize + 6)
-        case .monocle(let windowCount):
+        case .layout(.monocle, let windowCount, _):
             return CGSize(width: windowCount > 1 ? fontSize + 15 : fontSize + 6, height: fontSize + 6)
+        case .layout(.tile, _, _):
+            return CGSize(width: fontSize + 10, height: fontSize + 6)
         }
     }
 
     var accessibilityLabel: String {
         switch self {
-        case .badge(let number, let active):
-            return active ? "Workspace \(number), Active" : "Workspace \(number)"
+        case .badge(let number, let active, let occupied):
+            if active { return "Workspace \(number), Active" }
+            return occupied ? "Workspace \(number)" : "Workspace \(number), Empty"
         case .symbol(_, let accessibilityLabel):
             return accessibilityLabel
         case .monitor(let number):
             return "Display \(number)"
-        case .monocle(let windowCount):
-            return windowCount == 1 ? "Monocle Layout, 1 Window" : "Monocle Layout, \(windowCount) Windows"
+        case .layout(let layout, let windowCount, _):
+            let name = layout == .monocle ? "Monocle" : "Tile"
+            return "\(name) Layout, \(windowCount) \(windowCount == 1 ? "Window" : "Windows")"
         }
     }
 }
@@ -332,6 +372,7 @@ private struct StatusState: Equatable {
     let activeLayout: Layout
     let occupiedWorkspaces: [Bool]
     let activeWindowCount: Int
+    let masterRatio: CGFloat
 
     @MainActor
     static func capture(_ ws: WorkspaceManager) -> StatusState {
@@ -345,7 +386,8 @@ private struct StatusState: Equatable {
                 hotkeyIssueCount: Hotkeys.shared.issueCount,
                 tilingPaused: ws.isTilingPaused,
                 monitorCount: 0, focusedMonitorIndex: 0, activeWorkspace: 0,
-                activeLayout: .tile, occupiedWorkspaces: [], activeWindowCount: 0
+                activeLayout: .tile, occupiedWorkspaces: [], activeWindowCount: 0,
+                masterRatio: Config.shared.masterRatio
             )
         }
         let monitor = ws.focusedMonitor
@@ -362,7 +404,8 @@ private struct StatusState: Equatable {
             activeWorkspace: monitor.active,
             activeLayout: monitor.layouts[monitor.active],
             occupiedWorkspaces: occupied,
-            activeWindowCount: monitor.workspaces[monitor.active].count
+            activeWindowCount: monitor.workspaces[monitor.active].count,
+            masterRatio: Config.shared.masterRatio
         )
     }
 }
@@ -370,6 +413,7 @@ private struct StatusState: Equatable {
 private final class StatusContentView: NSView {
     private static let spacing: CGFloat = 4
     private static let horizontalPadding: CGFloat = 4
+    private static let emptyWorkspaceAlpha: CGFloat = 0.45
 
     private var segments: [StatusSegment] = []
     private var fontSize: CGFloat = NSFont.menuBarFont(ofSize: 0).pointSize
@@ -405,17 +449,22 @@ private final class StatusContentView: NSView {
 
     override func draw(_ dirtyRect: NSRect) {
         guard let ctx = NSGraphicsContext.current?.cgContext else { return }
-        var x = Self.horizontalPadding
-        for segment in segments {
-            let size = segment.size(fontSize: fontSize)
-            let rect = NSRect(
-                x: x,
-                y: bounds.midY - size.height / 2,
-                width: size.width,
-                height: size.height
-            )
+        for (segment, rect) in segmentFrames() {
             draw(segment, in: rect, ctx: ctx)
+        }
+    }
+
+    func segment(at point: NSPoint) -> StatusSegment? {
+        segmentFrames().first { $0.1.contains(point) }?.0
+    }
+
+    private func segmentFrames() -> [(StatusSegment, NSRect)] {
+        var x = Self.horizontalPadding
+        return segments.map { segment in
+            let size = segment.size(fontSize: fontSize)
+            let rect = NSRect(x: x, y: bounds.midY - size.height / 2, width: size.width, height: size.height)
             x += size.width + Self.spacing
+            return (segment, rect)
         }
     }
 
@@ -424,14 +473,19 @@ private final class StatusContentView: NSView {
         defer { ctx.restoreGState() }
 
         switch segment {
-        case .badge(let number, let active):
+        case .badge(let number, let active, let occupied):
+            if !active && !occupied {
+                ctx.setAlpha(Self.emptyWorkspaceAlpha)
+            }
             drawWorkspaceBadge(number: number, active: active, in: rect, ctx: ctx)
         case .symbol(let name, let accessibilityLabel):
             drawSymbolBadge(name: name, accessibilityLabel: accessibilityLabel, in: rect, ctx: ctx)
         case .monitor(let number):
             drawMonitorBadge(number: number, in: rect, ctx: ctx)
-        case .monocle(let windowCount):
+        case .layout(.monocle, let windowCount, _):
             drawMonocleBadge(windowCount: windowCount, in: rect, ctx: ctx)
+        case .layout(.tile, let windowCount, let masterRatio):
+            drawTileBadge(windowCount: windowCount, masterRatio: masterRatio, in: rect, ctx: ctx)
         }
     }
 
@@ -500,6 +554,7 @@ private final class StatusContentView: NSView {
         ctx.setLineWidth(1)
         ctx.strokePath()
 
+        guard windowCount > 0 else { return }
         let iconSize = fontSize - 5
         let iconX = windowCount > 1 ? badgeRect.minX + 4 : badgeRect.midX - iconSize / 2
         let iconRect = CGRect(x: iconX, y: badgeRect.midY - iconSize / 2, width: iconSize, height: iconSize)
@@ -516,5 +571,20 @@ private final class StatusContentView: NSView {
             )
             drawCenteredText("\(windowCount)", in: textRect, fontSize: fontSize, color: badgeColor, ctx: ctx)
         }
+    }
+
+    private func drawTileBadge(windowCount: Int, masterRatio: CGFloat, in rect: NSRect, ctx: CGContext) {
+        let badgeRect = rect.insetBy(dx: 0.5, dy: 0.5)
+        ctx.addPath(CGPath(roundedRect: badgeRect, cornerWidth: 3, cornerHeight: 3, transform: nil))
+        ctx.setStrokeColor(badgeColor.cgColor)
+        ctx.setLineWidth(1)
+        ctx.strokePath()
+
+        let area = badgeRect.insetBy(dx: 3, dy: 3)
+        for pane in TileGlyph.rects(windowCount: windowCount, masterRatio: masterRatio, in: area) {
+            ctx.addPath(CGPath(roundedRect: pane, cornerWidth: 1, cornerHeight: 1, transform: nil))
+        }
+        ctx.setFillColor(badgeColor.cgColor)
+        ctx.fillPath()
     }
 }
