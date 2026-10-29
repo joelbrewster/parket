@@ -285,44 +285,6 @@ private final class BarContentView: NSView {
 
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        trackingAreas.forEach(removeTrackingArea)
-        addTrackingArea(
-            NSTrackingArea(
-                rect: .zero,
-                options: [.mouseMoved, .mouseEnteredAndExited, .activeAlways, .inVisibleRect],
-                owner: self,
-                userInfo: nil
-            )
-        )
-    }
-
-    override func mouseMoved(with event: NSEvent) {
-        hover(at: convert(event.locationInWindow, from: nil))
-    }
-
-    override func mouseExited(with event: NSEvent) {
-        BarStatusMenu.shared.leaveBar()
-    }
-
-    private func hover(at point: NSPoint) {
-        guard let (hit, rect) = hits.first(where: { $0.1.contains(point) }) else {
-            BarStatusMenu.shared.leaveBar()
-            return
-        }
-        switch hit {
-        case .music:
-            BarStatusMenu.shared.enter(.music, rect: rect, in: self)
-        case .weather:
-            BarStatusMenu.shared.enter(.weather, rect: rect, in: self)
-        case .clock:
-            BarStatusMenu.shared.enter(.clock, rect: rect, in: self)
-        default:
-            BarStatusMenu.shared.leaveBar()
-        }
-    }
-
     func update(
         tags: [BarTag],
         layout: Layout,

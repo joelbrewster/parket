@@ -4,13 +4,7 @@ import Foundation
 package final class Weather {
     package static let shared = Weather()
 
-    package struct Day {
-        package let name: String
-        package let detail: String
-    }
-
     package private(set) var text = ""
-    package private(set) var days: [Day] = []
 
     private var timer: Timer?
     private var inFlight = false
@@ -36,10 +30,8 @@ package final class Weather {
         Task {
             let next = await WeatherAPI.fetch()
             inFlight = false
-            guard let next else { return }
-            guard next.text != text || next.days.map(\.detail) != days.map(\.detail) else { return }
-            text = next.text
-            days = next.days
+            guard let next, next != text else { return }
+            text = next
             Bar.shared.update()
         }
     }
@@ -53,15 +45,13 @@ private enum WeatherAPI {
         return URLSession(configuration: config)
     }()
 
-    static func fetch() async -> (text: String, days: [Weather.Day])? {
+    static func fetch() async -> String? {
         guard let location = await location() else { return nil }
         var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")
         components?.queryItems = [
             URLQueryItem(name: "latitude", value: String(location.latitude)),
             URLQueryItem(name: "longitude", value: String(location.longitude)),
             URLQueryItem(name: "current", value: "temperature_2m,weather_code"),
-            URLQueryItem(name: "daily", value: "weather_code,temperature_2m_max,temperature_2m_min"),
-            URLQueryItem(name: "forecast_days", value: "5"),
             URLQueryItem(name: "timezone", value: "auto"),
         ]
         guard let url = components?.url else { return nil }
@@ -69,44 +59,10 @@ private enum WeatherAPI {
         guard let current = json["current"] as? [String: Any] else { return nil }
         guard let temperature = number(current["temperature_2m"]) else { return nil }
         let degrees = "\(Int(temperature.rounded()))°"
-        let text: String
         if let code = number(current["weather_code"]).map({ Int($0) }) {
-            text = "\(label(for: code)) \(degrees)"
-        } else {
-            text = degrees
+            return "\(label(for: code)) \(degrees)"
         }
-        return (text, days(from: json["daily"] as? [String: Any]))
-    }
-
-    private static func days(from daily: [String: Any]?) -> [Weather.Day] {
-        guard let daily else { return [] }
-        guard let times = daily["time"] as? [String] else { return [] }
-        let codes = daily["weather_code"] as? [Any] ?? []
-        let highs = daily["temperature_2m_max"] as? [Any] ?? []
-        let lows = daily["temperature_2m_min"] as? [Any] ?? []
-        let parse = DateFormatter()
-        parse.calendar = Calendar.current
-        parse.locale = Locale(identifier: "en_US_POSIX")
-        parse.dateFormat = "yyyy-MM-dd"
-        let name = DateFormatter()
-        name.locale = .current
-        name.dateFormat = "EEE"
-        return times.enumerated().compactMap { index, value in
-            guard let date = parse.date(from: value) else { return nil }
-            let day = Calendar.current.isDateInToday(date) ? "Now" : name.string(from: date)
-            let code = index < codes.count ? number(codes[index]).map { Int($0) } : nil
-            let high = index < highs.count ? number(highs[index]).map { Int($0.rounded()) } : nil
-            let low = index < lows.count ? number(lows[index]).map { Int($0.rounded()) } : nil
-            let weather = code.map(label(for:)) ?? ""
-            let range: String
-            if let high, let low {
-                range = "\(high)° / \(low)°"
-            } else {
-                range = ""
-            }
-            let detail = [weather, range].filter { !$0.isEmpty }.joined(separator: "  ")
-            return Weather.Day(name: day, detail: detail)
-        }
+        return degrees
     }
 
     private static func location() async -> (latitude: Double, longitude: Double)? {
