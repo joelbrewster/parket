@@ -66,6 +66,8 @@ package final class Bar {
             clockTimer = timer
         }
         Weather.shared.start()
+        Battery.shared.start()
+        NowPlaying.shared.start()
         DesktopBackground.shared.start()
         sync(screens: NSScreen.screens)
     }
@@ -103,7 +105,7 @@ package final class Bar {
     }
 
     package func update() {
-        let clock = statusText()
+        let status = statusItems()
         let ws = WorkspaceManager.shared
         let focusedID = ws.monitors.isEmpty ? nil : ws.focusedMonitor.displayID
         for (id, panel) in panels {
@@ -115,22 +117,25 @@ package final class Bar {
                 title: title(for: monitor),
                 titleHighlighted: monitor?.displayID == focusedID,
                 floating: monitor?.focusedWindowIsFloating == true,
-                clock: clock
+                status: status
             )
         }
     }
 
     private func refreshClock() {
-        let clock = statusText()
+        let status = statusItems()
         for panel in panels.values {
-            panel.barView.updateClock(clock)
+            panel.barView.updateStatus(status)
         }
     }
 
-    private func statusText() -> String {
-        let clock = clockFormatter.string(from: Date())
-        let weather = Weather.shared.text
-        return weather.isEmpty ? clock : "\(weather)  \(clock)"
+    private func statusItems() -> BarStatus {
+        BarStatus(
+            music: NowPlaying.shared.text,
+            battery: Battery.shared.text,
+            weather: Weather.shared.text,
+            clock: clockFormatter.string(from: Date())
+        )
     }
 
     private func tags(for monitor: Monitor?) -> [BarTag] {
@@ -226,9 +231,31 @@ private final class BarPanel: NSPanel {
     }
 }
 
+private struct BarStatus {
+    var music = ""
+    var battery = ""
+    var weather = ""
+    var clock = ""
+}
+
 private enum BarHit {
     case tag(Int)
     case layout
+    case music
+    case battery
+    case weather
+    case clock
+}
+
+private enum BarLaunch {
+    static func open(bundleID: String) {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return }
+        NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
+    }
+
+    static func open(_ url: URL) {
+        NSWorkspace.shared.open(url)
+    }
 }
 
 private final class BarContentView: NSView {
@@ -239,7 +266,7 @@ private final class BarContentView: NSView {
     private var titleText = ""
     private var titleHighlighted = false
     private var floating = false
-    private var clock = ""
+    private var status = BarStatus()
     private var hits: [(BarHit, NSRect)] = []
 
     override init(frame frameRect: NSRect) {
@@ -265,7 +292,7 @@ private final class BarContentView: NSView {
         title: String,
         titleHighlighted: Bool,
         floating: Bool,
-        clock: String
+        status: BarStatus
     ) {
         self.tags = tags
         self.layout = layout
@@ -273,12 +300,12 @@ private final class BarContentView: NSView {
         titleText = title
         self.titleHighlighted = titleHighlighted
         self.floating = floating
-        self.clock = clock
+        self.status = status
         needsDisplay = true
     }
 
-    func updateClock(_ clock: String) {
-        self.clock = clock
+    func updateStatus(_ status: BarStatus) {
+        self.status = status
         needsDisplay = true
     }
 
@@ -332,18 +359,25 @@ private final class BarContentView: NSView {
             x = countRect.maxX
         }
 
-        let clockWidth = textSize(clock, font: font).width + 24
-        let clockRect = NSRect(
-            x: bounds.maxX - clockWidth,
-            y: topPad,
-            width: clockWidth,
-            height: contentHeight
-        )
-        drawText(clock, in: clockRect, font: font, color: .secondaryLabelColor, truncate: true, textY: textY, textHeight: textHeight)
+        var right = bounds.maxX - margin
+        let statusItems: [(String, BarHit)] = [
+            (status.clock, .clock),
+            (status.weather, .weather),
+            (status.battery, .battery),
+            (status.music, .music),
+        ]
+        for (text, hit) in statusItems {
+            guard !text.isEmpty else { continue }
+            let width = ceil(textSize(text, font: font).width) + 16
+            right -= width
+            let rect = NSRect(x: right, y: topPad, width: width, height: contentHeight)
+            drawText(text, in: rect, font: font, color: .secondaryLabelColor, textY: textY, textHeight: textHeight)
+            hits.append((hit, rect))
+        }
 
         let titleMargin: CGFloat = 8
         let titlePadding: CGFloat = 10
-        let titleSlot = max(0, clockRect.minX - x)
+        let titleSlot = max(0, right - x)
         let titleRect = NSRect(
             x: x + titleMargin,
             y: topPad,
@@ -378,6 +412,21 @@ private final class BarContentView: NSView {
             WorkspaceManager.shared.switchTo(index, displayID: displayID)
         case .layout:
             WorkspaceManager.shared.toggleLayout(displayID: displayID)
+        case .music:
+            BarLaunch.open(bundleID: "com.apple.Music")
+        case .battery:
+            let panes = [
+                "x-apple.systempreferences:com.apple.Battery-Settings.extension",
+                "x-apple.systempreferences:com.apple.preference.battery",
+            ]
+            for pane in panes {
+                if let url = URL(string: pane), NSWorkspace.shared.open(url) { return }
+            }
+            BarLaunch.open(bundleID: "com.apple.systempreferences")
+        case .weather:
+            BarLaunch.open(bundleID: "com.apple.weather")
+        case .clock:
+            BarLaunch.open(bundleID: "com.apple.iCal")
         }
     }
 
