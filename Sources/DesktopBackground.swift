@@ -16,11 +16,53 @@ enum MenuBarChrome {
     }
 
     static var accent: NSColor {
-        var result = NSColor.controlAccentColor
+        opaque(highlight() ?? NSColor.controlAccentColor)
+    }
+
+    private static func highlight() -> NSColor? {
+        UserDefaults.standard.synchronize()
+        guard let value = UserDefaults.standard.string(forKey: "AppleHighlightColor") else {
+            return nil
+        }
+        let parts = value.split(whereSeparator: \.isWhitespace).map(String.init)
+        if parts.count >= 4 {
+            let name = parts[3].lowercased()
+            if name != "other", let color = themeAccent(named: name) {
+                return color
+            }
+        }
+        if parts.count >= 3,
+            let r = Double(parts[0]), let g = Double(parts[1]), let b = Double(parts[2])
+        {
+            return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
+        }
+        return nil
+    }
+
+    private static func themeAccent(named name: String) -> NSColor? {
+        switch name {
+        case "blue": return .systemBlue
+        case "purple": return .systemPurple
+        case "pink": return .systemPink
+        case "red": return .systemRed
+        case "orange": return .systemOrange
+        case "yellow", "gold": return .systemYellow
+        case "green": return .systemGreen
+        case "graphite", "gray", "grey": return .systemGray
+        default: return nil
+        }
+    }
+
+    private static func opaque(_ color: NSColor) -> NSColor {
+        var result = color
         appearance.performAsCurrentDrawingAppearance {
-            let color = NSColor.controlAccentColor
             if let rgb = color.usingColorSpace(.sRGB) {
-                result = NSColor(srgbRed: rgb.redComponent, green: rgb.greenComponent, blue: rgb.blueComponent, alpha: 1)
+                result = NSColor(
+                    srgbRed: rgb.redComponent,
+                    green: rgb.greenComponent,
+                    blue: rgb.blueComponent,
+                    alpha: 1
+                )
             }
         }
         return result
@@ -33,6 +75,8 @@ package final class DesktopBackground {
 
     private var appearanceObservation: NSKeyValueObservation?
     private var themeObserver: NSObjectProtocol?
+    private var colorObserver: NSObjectProtocol?
+    private var highlightObserver: NSObjectProtocol?
     private var screenObserver: NSObjectProtocol?
 
     private init() {}
@@ -48,6 +92,28 @@ package final class DesktopBackground {
         if themeObserver == nil {
             themeObserver = DistributedNotificationCenter.default.addObserver(
                 forName: Notification.Name("AppleInterfaceThemeChangedNotification"),
+                object: nil,
+                queue: .main
+            ) { _ in
+                DispatchQueue.main.async {
+                    DesktopBackground.shared.apply()
+                }
+            }
+        }
+        if colorObserver == nil {
+            colorObserver = NotificationCenter.default.addObserver(
+                forName: NSColor.systemColorsDidChangeNotification,
+                object: nil,
+                queue: .main
+            ) { _ in
+                DispatchQueue.main.async {
+                    DesktopBackground.shared.apply()
+                }
+            }
+        }
+        if highlightObserver == nil {
+            highlightObserver = DistributedNotificationCenter.default.addObserver(
+                forName: Notification.Name("AppleColorPreferencesChangedNotification"),
                 object: nil,
                 queue: .main
             ) { _ in
