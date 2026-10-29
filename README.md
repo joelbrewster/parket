@@ -46,7 +46,7 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + H` / `Option + L` | Shrink or grow the master column |
 | `Option + B` | Show or hide the top bar |
 | `Option + Shift + C` | Reload config |
-| `Option + Shift + Return` | Spawn a new window of the default terminal |
+| `Option + Shift + Return` | Spawn a new window of the configured terminal |
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
 | `Option + Shift + ,` / `Option + Shift + .` | Move window to previous or next monitor |
 
@@ -81,6 +81,7 @@ bar_tag_highlight = "fill"     # same options for workspace numbers; omit to fol
 bar_gap = 0                    # extra space under the bar
 border_width = 2
 border_radius = 8
+terminal = ""                  # app name or bundle id; empty uses the macOS default terminal
 
 [bindings]
 focus_next = "j"

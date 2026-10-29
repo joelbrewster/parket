@@ -215,6 +215,7 @@ package struct Config {
     package var barGap: CGFloat = 0
     package var borderWidth: CGFloat = 2
     package var borderRadius: CGFloat = 8
+    package var terminal = ""
     package var customBindings: [Binding] = []
     package var rules: [AppRule] = []
     package var bindings = BuiltinBindings()
@@ -327,6 +328,10 @@ package struct Config {
             } else {
                 report("unknown bar_tag_highlight '\(highlight)', using \(config.barTagHighlight.rawValue)")
             }
+        }
+
+        if let terminal = toml["terminal"] as? String {
+            config.terminal = terminal.trimmingCharacters(in: .whitespacesAndNewlines)
         }
 
         if let mod = toml["modifier"] as? String {

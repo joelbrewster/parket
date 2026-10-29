@@ -4,22 +4,19 @@ import AppKit
 package final class PermissionWindowController: NSWindowController {
     package static let shared = PermissionWindowController()
 
-    private let titleLabel = PermissionWindowController.label("parket needs Accessibility", size: 17, weight: .semibold)
-    private let detailsLabel = PermissionWindowController.wrappingLabel(
-        "Grant Accessibility, then use Recheck. parket starts tiling only after Accessibility is granted."
-    )
-    private let accessibilityState = PermissionWindowController.label("", size: 13, weight: .regular)
-    private let startupIssueLabel = PermissionWindowController.wrappingLabel("")
+    private let issueLabel = PermissionWindowController.wrappingLabel("")
 
     private init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 220),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 440, height: 200),
+            styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
         )
-        window.title = "parket Accessibility"
+        window.title = "parket"
         window.isReleasedWhenClosed = false
+        window.isRestorable = false
+        window.isMovableByWindowBackground = true
         super.init(window: window)
         buildContent()
     }
@@ -30,16 +27,15 @@ package final class PermissionWindowController: NSWindowController {
     package func show(snapshot: PermissionSnapshot, startupIssue: String?) {
         update(snapshot: snapshot, startupIssue: startupIssue)
         guard let window else { return }
-        window.center()
+        if !window.isVisible { window.center() }
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
 
-    package func update(snapshot: PermissionSnapshot, startupIssue: String?) {
-        accessibilityState.stringValue = Self.stateText(snapshot.accessibility)
-        accessibilityState.textColor = Self.stateColor(snapshot.accessibility)
-        startupIssueLabel.stringValue = startupIssue ?? ""
-        startupIssueLabel.isHidden = startupIssue == nil
+    package func update(snapshot _: PermissionSnapshot, startupIssue: String?) {
+        issueLabel.stringValue = startupIssue ?? ""
+        issueLabel.isHidden = startupIssue == nil || startupIssue?.isEmpty == true
+        sizeToFit()
     }
 
     package func closeWindow() {
@@ -47,58 +43,79 @@ package final class PermissionWindowController: NSWindowController {
     }
 
     private func buildContent() {
-        let openAccessibility = NSButton(
-            title: "Open Accessibility Settings",
+        let icon = NSImageView()
+        icon.image = NSApp.applicationIconImage
+        icon.imageScaling = .scaleProportionallyUpOrDown
+        icon.translatesAutoresizingMaskIntoConstraints = false
+
+        let title = Self.label("Accessibility Access Needed", style: .headline, color: .labelColor)
+        let body = Self.wrappingLabel(
+            "Parket needs Accessibility to move and resize windows. Open System Settings, enable parket under Privacy & Security → Accessibility, then click Check Again."
+        )
+        body.textColor = .secondaryLabelColor
+        issueLabel.textColor = .secondaryLabelColor
+        issueLabel.font = NSFont.preferredFont(forTextStyle: .callout)
+
+        let textStack = NSStackView()
+        textStack.orientation = .vertical
+        textStack.alignment = .leading
+        textStack.spacing = 6
+        textStack.translatesAutoresizingMaskIntoConstraints = false
+        for view in [title, body, issueLabel] {
+            textStack.addArrangedSubview(view)
+        }
+        textStack.setCustomSpacing(10, after: body)
+
+        let openSettings = NSButton(
+            title: "Open System Settings",
             target: self,
             action: #selector(openAccessibilitySettings)
         )
-        let recheck = NSButton(
-            title: "Recheck",
+        openSettings.bezelStyle = .rounded
+        openSettings.keyEquivalent = "\r"
+
+        let checkAgain = NSButton(
+            title: "Check Again",
             target: self,
             action: #selector(recheckPermissions)
         )
-        recheck.keyEquivalent = "\r"
+        checkAgain.bezelStyle = .rounded
 
-        let rows = NSStackView(views: [
-            permissionRow(title: "Accessibility", state: accessibilityState, button: openAccessibility)
-        ])
-        rows.orientation = .vertical
-        rows.spacing = 10
+        let buttons = NSStackView(views: [checkAgain, openSettings])
+        buttons.orientation = .horizontal
+        buttons.alignment = .centerY
+        buttons.spacing = 12
+        buttons.translatesAutoresizingMaskIntoConstraints = false
 
-        let content = NSStackView(views: [
-            titleLabel,
-            detailsLabel,
-            rows,
-            startupIssueLabel,
-            recheck,
-        ])
-        content.orientation = .vertical
-        content.alignment = .leading
-        content.spacing = 14
-        content.edgeInsets = NSEdgeInsets(top: 22, left: 24, bottom: 20, right: 24)
-        content.translatesAutoresizingMaskIntoConstraints = false
-
-        window?.contentView = NSView()
-        guard let contentView = window?.contentView else { return }
-        contentView.addSubview(content)
+        let root = NSView()
+        root.addSubview(icon)
+        root.addSubview(textStack)
+        root.addSubview(buttons)
+        window?.contentView = root
         NSLayoutConstraint.activate([
-            content.leadingAnchor.constraint(equalTo: contentView.leadingAnchor),
-            content.trailingAnchor.constraint(equalTo: contentView.trailingAnchor),
-            content.topAnchor.constraint(equalTo: contentView.topAnchor),
-            content.bottomAnchor.constraint(lessThanOrEqualTo: contentView.bottomAnchor),
+            icon.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 20),
+            icon.topAnchor.constraint(equalTo: root.topAnchor, constant: 20),
+            icon.widthAnchor.constraint(equalToConstant: 64),
+            icon.heightAnchor.constraint(equalToConstant: 64),
+
+            textStack.leadingAnchor.constraint(equalTo: icon.trailingAnchor, constant: 16),
+            textStack.topAnchor.constraint(equalTo: root.topAnchor, constant: 22),
+            textStack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+
+            buttons.topAnchor.constraint(greaterThanOrEqualTo: textStack.bottomAnchor, constant: 20),
+            buttons.topAnchor.constraint(greaterThanOrEqualTo: icon.bottomAnchor, constant: 20),
+            buttons.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -20),
+            buttons.leadingAnchor.constraint(greaterThanOrEqualTo: root.leadingAnchor, constant: 20),
+            buttons.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -20),
         ])
+        sizeToFit()
     }
 
-    private func permissionRow(title: String, state: NSTextField, button: NSButton) -> NSStackView {
-        let name = Self.label(title, size: 13, weight: .medium)
-        name.widthAnchor.constraint(equalToConstant: 130).isActive = true
-        state.widthAnchor.constraint(equalToConstant: 76).isActive = true
-
-        let row = NSStackView(views: [name, state, button])
-        row.orientation = .horizontal
-        row.alignment = .centerY
-        row.spacing = 10
-        return row
+    private func sizeToFit() {
+        guard let window, let content = window.contentView else { return }
+        content.layoutSubtreeIfNeeded()
+        let size = content.fittingSize
+        window.setContentSize(NSSize(width: 440, height: max(size.height, 160)))
     }
 
     @objc private func openAccessibilitySettings() {
@@ -111,25 +128,19 @@ package final class PermissionWindowController: NSWindowController {
         ParketRuntime.shared.refreshPermissions(prompt: false)
     }
 
-    private static func label(_ text: String, size: CGFloat, weight: NSFont.Weight) -> NSTextField {
+    private static func label(_ text: String, style: NSFont.TextStyle, color: NSColor) -> NSTextField {
         let field = NSTextField(labelWithString: text)
-        field.font = NSFont.systemFont(ofSize: size, weight: weight)
+        field.font = NSFont.preferredFont(forTextStyle: style)
+        field.textColor = color
+        field.lineBreakMode = .byWordWrapping
+        field.maximumNumberOfLines = 0
         return field
     }
 
     private static func wrappingLabel(_ text: String) -> NSTextField {
-        let field = label(text, size: 13, weight: .regular)
-        field.lineBreakMode = .byWordWrapping
-        field.maximumNumberOfLines = 0
-        field.preferredMaxLayoutWidth = 420
+        let field = label(text, style: .body, color: .labelColor)
+        field.preferredMaxLayoutWidth = 320
+        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         return field
-    }
-
-    private static func stateText(_ granted: Bool) -> String {
-        granted ? "Granted" : "Missing"
-    }
-
-    private static func stateColor(_ granted: Bool) -> NSColor {
-        granted ? .systemGreen : .systemRed
     }
 }

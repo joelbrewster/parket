@@ -111,6 +111,14 @@ struct ConfigTests {
         #expect(config.borderRadius == 8)
     }
 
+    @Test func terminalParsesAppName() throws {
+        #expect(Config().terminal.isEmpty)
+        let config = try #require(Config.parse("terminal = \"Ghostty\""))
+        #expect(config.terminal == "Ghostty")
+        let bundle = try #require(Config.parse("terminal = \"com.mitchellh.ghostty\""))
+        #expect(bundle.terminal == "com.mitchellh.ghostty")
+    }
+
     @Test func workspaceLetterKeysDefaultOffAndParse() throws {
         #expect(!Config().workspaceLetterKeys)
         let config = try #require(Config.parse("workspace_letter_keys = true"))

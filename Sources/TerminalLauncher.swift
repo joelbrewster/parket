@@ -3,7 +3,7 @@ import AppKit
 @MainActor
 enum TerminalLauncher {
     static func spawn() {
-        let app = defaultApp()
+        let app = configuredApp() ?? defaultApp()
         let path = app.path
         DispatchQueue.global(qos: .userInitiated).async {
             let process = Process()
@@ -11,6 +11,22 @@ enum TerminalLauncher {
             process.arguments = ["-n", "-a", path]
             try? process.run()
         }
+    }
+
+    private static func configuredApp() -> URL? {
+        let name = Config.shared.terminal
+        guard !name.isEmpty else { return nil }
+        if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: name) {
+            return url
+        }
+        let appName = name.hasSuffix(".app") ? name : "\(name).app"
+        for folder in ["/Applications", NSHomeDirectory() + "/Applications"] {
+            let path = "\(folder)/\(appName)"
+            if FileManager.default.fileExists(atPath: path) {
+                return URL(fileURLWithPath: path)
+            }
+        }
+        return nil
     }
 
     private static func defaultApp() -> URL {

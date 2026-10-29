@@ -61,6 +61,7 @@ package final class ParketRuntime {
             "bar: \(Config.shared.bar ? "on" : "off")",
             "menu_bar_icon: \(Config.shared.menuBarIcon ? "on" : "off")",
             "bar_font: \(Config.shared.barFont.rawValue)",
+            "terminal: \(Config.shared.terminal.isEmpty ? "default" : Config.shared.terminal)",
             "monitor_count: \(ws.monitors.count)",
             "ax_messaging_timeout_seconds: \(WindowManager.messagingTimeoutSeconds)",
         ])

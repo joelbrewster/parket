@@ -371,7 +371,11 @@ private final class BarContentView: NSView {
             let width = ceil(textSize(text, font: font).width) + 16
             right -= width
             let rect = NSRect(x: right, y: topPad, width: width, height: contentHeight)
-            drawText(text, in: rect, font: font, color: .secondaryLabelColor, textY: textY, textHeight: textHeight)
+            let color: NSColor = {
+                if case .clock = hit { return .labelColor }
+                return .secondaryLabelColor
+            }()
+            drawText(text, in: rect, font: font, color: color, textY: textY, textHeight: textHeight)
             hits.append((hit, rect))
         }
 

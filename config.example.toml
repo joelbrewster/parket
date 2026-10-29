@@ -38,6 +38,9 @@
 # border_width = 2
 # border_radius = 8
 
+# app name or bundle id for option+shift+return; omit to use the macOS default terminal
+# terminal = "Ghostty"
+
 # built-in action bindings
 # key names: a-z, 0-9, return, tab, space, escape, delete,
 #   comma, period, slash, backslash, minus, equal, grave,
