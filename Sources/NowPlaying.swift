@@ -105,6 +105,17 @@ package final class NowPlaying: NSObject {
         }
     }
 
+    package func previous() { run("previous track") }
+    package func playPause() { run("playpause") }
+    package func next() { run("next track") }
+
+    private func run(_ command: String) {
+        let script = NSAppleScript(source: "tell application \"Music\" to \(command)")
+        var error: NSDictionary?
+        script?.executeAndReturnError(&error)
+        refresh()
+    }
+
     private func setText(_ next: String) {
         let clipped = clip(next)
         guard clipped != text else { return }
