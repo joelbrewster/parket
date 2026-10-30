@@ -11,7 +11,7 @@ package final class WorkspaceManager {
     private static let screenChangePostSettleDelay: TimeInterval = 0.75
     private static let screenChangeEmptySnapshotRetryDelay: TimeInterval = 0.15
     private static let screenChangeEmptySnapshotMaxAttempts = 8
-    private static let focusFollowRetryDelay: TimeInterval = 0.015
+    private static let focusFollowRetryDelay: TimeInterval = 0.02
     private static let focusFollowMaxAttempts = 5
     private static let internalFocusSuppressionDelay: TimeInterval = 0.16
     private static let fallbackRegistryRefreshDelay: TimeInterval = 0.02
@@ -19,10 +19,10 @@ package final class WorkspaceManager {
     private(set) var monitors: [Monitor] = []
     private(set) var focusedMonitorIndex: Int = 0
     package private(set) var isTilingPaused = false
-    private var screenChangeWork: DispatchWorkItem?
-    private var focusFollowWork: DispatchWorkItem?
-    private var registryRefreshWorks: [pid_t: DispatchWorkItem] = [:]
-    private var windowSnapshotSyncWorks: [pid_t: DispatchWorkItem] = [:]
+    private let screenChangeDebounce = Debounce()
+    private let focusFollowDebounce = Debounce()
+    private let registryRefreshDebounce = DebounceMap<pid_t>()
+    private let windowSnapshotDebounce = DebounceMap<pid_t>()
     private var pendingFocusRepairs: [pid_t: ClosedWindowFocusRepair] = [:]
     private var pendingClosedWindowPIDs: Set<pid_t> = []
     private var ignoreExternalFocusUntil: TimeInterval = 0
@@ -143,7 +143,7 @@ package final class WorkspaceManager {
             return
         }
 
-        windowSnapshotSyncWorks.removeValue(forKey: pid)?.cancel()
+        windowSnapshotDebounce.cancel(pid)
 
         var changed = false
         var unmatchedCurrent = windows
@@ -182,8 +182,8 @@ package final class WorkspaceManager {
                 changed = true
             }
         }
-        registryRefreshWorks.removeValue(forKey: pid)?.cancel()
-        windowSnapshotSyncWorks.removeValue(forKey: pid)?.cancel()
+        registryRefreshDebounce.cancel(pid)
+        windowSnapshotDebounce.cancel(pid)
         pendingFocusRepairs.removeValue(forKey: pid)
         pendingClosedWindowPIDs.remove(pid)
         windowRegistry.remove(pid: pid)
@@ -220,11 +220,13 @@ package final class WorkspaceManager {
     func focusNext() {
         guard !monitors.isEmpty else { return }
         focusedMonitor.focusNext()
+        FocusBorder.shared.update()
     }
 
     func focusPrev() {
         guard !monitors.isEmpty else { return }
         focusedMonitor.focusPrev()
+        FocusBorder.shared.update()
     }
 
     func swapMaster() {
@@ -260,22 +262,34 @@ package final class WorkspaceManager {
         let target = focusedMonitor
         target.restoreFocusedWindow()
         StatusBar.shared.update()
+        FocusBorder.shared.update()
     }
 
     func moveWindowToMonitor(offset: Int) {
         guard !isTilingPaused else { return }
         guard monitors.count > 1 else { return }
         guard let focused = WindowManager.focusedWindow() else { return }
-
-        let source = focusedMonitor
-        guard let i = source.workspaces[source.active].firstIndex(of: focused) else { return }
-        let moved = focused.keepingMembers(from: source.workspaces[source.active][i])
+        guard let sourceIndex = monitors.firstIndex(where: { $0.containsWindow(focused) }) else { return }
+        let source = monitors[sourceIndex]
+        var workspaceIndex = source.active
+        var windowIndex = source.workspaces[source.active].firstIndex(of: focused)
+        if windowIndex == nil {
+            for index in source.workspaces.indices {
+                if let i = source.workspaces[index].firstIndex(of: focused) {
+                    workspaceIndex = index
+                    windowIndex = i
+                    break
+                }
+            }
+        }
+        guard let i = windowIndex else { return }
+        let moved = focused.keepingMembers(from: source.workspaces[workspaceIndex][i])
         let wasFloating = source.isFloating(moved)
-        source.workspaces[source.active].remove(at: i)
+        source.workspaces[workspaceIndex].remove(at: i)
         source.setFloating(moved, false)
         source.retile(validate: false)
 
-        let targetIndex = (focusedMonitorIndex + offset + monitors.count) % monitors.count
+        let targetIndex = (sourceIndex + offset + monitors.count) % monitors.count
         let target = monitors[targetIndex]
         target.insertWindow(moved)
         target.setFloating(moved, wasFloating)
@@ -340,6 +354,7 @@ package final class WorkspaceManager {
             return
         }
         guard !isTilingPaused else { return }
+        FocusBorder.shared.concealUntilSettled()
         guard !monitor.shouldSuppressGeometryNotification() else { return }
         windowRegistry.upsert(window, at: location)
         WindowManager.invalidateAppliedGeometry(window)
@@ -356,21 +371,17 @@ package final class WorkspaceManager {
         guard !isTilingPaused else { return }
         guard !shouldSuppressExternalFocusFollow() else { return }
         guard NSWorkspace.shared.frontmostApplication?.processIdentifier == pid else { return }
-        focusFollowWork?.cancel()
+        focusFollowDebounce.cancel()
         performExternalFocus(pid: pid, attempt: 0)
     }
 
     private func scheduleExternalFocus(pid: pid_t, attempt: Int) {
-        focusFollowWork?.cancel()
-        let work = DispatchWorkItem { [self] in
+        focusFollowDebounce.schedule(after: Self.focusFollowRetryDelay) { [self] in
             performExternalFocus(pid: pid, attempt: attempt)
         }
-        focusFollowWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.focusFollowRetryDelay, execute: work)
     }
 
     private func performExternalFocus(pid: pid_t, attempt: Int) {
-        focusFollowWork = nil
         guard !isTilingPaused,
             !shouldSuppressExternalFocusFollow(),
             !monitors.isEmpty,
@@ -403,6 +414,7 @@ package final class WorkspaceManager {
             windowRegistry.recordFocus(window, at: location)
             WindowManager.recordExpectedFocus(window)
             StatusBar.shared.update()
+            FocusBorder.shared.update()
             return
         }
 
@@ -436,12 +448,9 @@ package final class WorkspaceManager {
     }
 
     private func scheduleScreenChange(signature: String, attempt: Int) {
-        screenChangeWork?.cancel()
-        let work = DispatchWorkItem { [self] in
+        screenChangeDebounce.schedule(after: Self.screenChangeDebounceDelay) { [self] in
             performStableScreenChange(expectedSignature: signature, attempt: attempt)
         }
-        screenChangeWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.screenChangeDebounceDelay, execute: work)
     }
 
     private func performStableScreenChange(expectedSignature: String, attempt: Int) {
@@ -455,7 +464,6 @@ package final class WorkspaceManager {
 
     private func performScreenChange() {
         PerformanceTelemetry.measure(.screenChange) {
-            screenChangeWork = nil
             extendScreenChangeSettleWindow(by: Self.screenChangePostSettleDelay)
             let screens = NSScreen.screens
             guard !screens.isEmpty else {
@@ -555,7 +563,8 @@ package final class WorkspaceManager {
         for monitor in monitors {
             monitor.resizeWorkspaces(to: count)
             if let geometry = snapshot.screen(displayID: monitor.displayID) {
-                monitor.tileFrame = Config.shared.bar
+                monitor.tileFrame =
+                    Config.shared.bar
                     ? BarLayout.tileFrame(
                         screenFrame: geometry.frame,
                         visibleFrame: geometry.visibleFrame,
@@ -757,7 +766,7 @@ package final class WorkspaceManager {
     }
 
     private func isScreenChangeSettling() -> Bool {
-        screenChangeWork != nil || ProcessInfo.processInfo.systemUptime < screenChangeSettleUntil
+        screenChangeDebounce.isPending || ProcessInfo.processInfo.systemUptime < screenChangeSettleUntil
     }
 
     private func extendScreenChangeSettleWindow(by delay: TimeInterval) {
@@ -774,9 +783,7 @@ package final class WorkspaceManager {
     }
 
     private func scheduleWindowSnapshotSync(pid: pid_t, attempt: Int, delay: TimeInterval) {
-        windowSnapshotSyncWorks[pid]?.cancel()
-        let work = DispatchWorkItem { [self] in
-            windowSnapshotSyncWorks.removeValue(forKey: pid)
+        windowSnapshotDebounce.schedule(pid, after: delay) { [self] in
             guard let windows = PerformanceTelemetry.measure(.axSnapshot, { WindowManager.windows(pid: pid) }) else {
                 if attempt < Self.screenChangeEmptySnapshotMaxAttempts {
                     scheduleWindowSnapshotSync(
@@ -789,11 +796,6 @@ package final class WorkspaceManager {
             }
             syncWindows(pid: pid, windows: windows, emptySnapshotRetryAttempt: attempt)
         }
-        windowSnapshotSyncWorks[pid] = work
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + delay,
-            execute: work
-        )
     }
 
     private func recordPendingFocusRepair(_ removed: RemovedWindowRecord) {
@@ -874,12 +876,8 @@ package final class WorkspaceManager {
     }
 
     private func scheduleRegistryRefresh(pid: pid_t) {
-        registryRefreshWorks[pid]?.cancel()
-        let work = DispatchWorkItem { [self] in
-            registryRefreshWorks.removeValue(forKey: pid)
+        registryRefreshDebounce.schedule(pid, after: Self.fallbackRegistryRefreshDelay) { [self] in
             refreshWindowRegistry(pid: pid)
         }
-        registryRefreshWorks[pid] = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.fallbackRegistryRefreshDelay, execute: work)
     }
 }

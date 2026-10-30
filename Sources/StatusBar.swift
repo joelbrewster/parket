@@ -17,12 +17,10 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         title: "Open Accessibility Settings", action: #selector(openAccessibilitySettings), keyEquivalent: "")
     private let recheckAccessibilityItem = NSMenuItem(
         title: "Recheck Accessibility", action: #selector(recheckPermissions), keyEquivalent: "")
-    private let barItem = NSMenuItem(title: "Show Bar", action: #selector(toggleBar), keyEquivalent: "")
-    private let menuBarIconItem = NSMenuItem(
-        title: "Show Menu Bar Icon", action: #selector(toggleMenuBarIcon), keyEquivalent: "")
-    private let barFontItem = NSMenuItem(title: "Bar Font", action: nil, keyEquivalent: "")
-    private let menubarFontItem = NSMenuItem(title: "Menu Bar", action: #selector(useMenubarFont), keyEquivalent: "")
-    private let monoFontItem = NSMenuItem(title: "Yakshaven", action: #selector(useMonoFont), keyEquivalent: "")
+    private let preferencesItem = NSMenuItem(
+        title: "Settings...", action: #selector(openPreferences), keyEquivalent: ",")
+    private let renameItem = NSMenuItem(
+        title: "Rename Workspace", action: #selector(renameWorkspace), keyEquivalent: "")
     private let openConfigItem = NSMenuItem(title: "Open Config", action: #selector(openConfig), keyEquivalent: "")
     private let reloadItem = NSMenuItem(title: "Reload Config", action: #selector(reloadConfig), keyEquivalent: "r")
     private let copyDiagnosticsItem = NSMenuItem(
@@ -46,19 +44,8 @@ package final class StatusBar: NSObject, NSMenuDelegate {
     private func buildMenu() {
         menu.delegate = self
         for item in [
-            pauseItem,
-            retileItem,
-            restoreItem,
-            openAccessibilityItem,
-            recheckAccessibilityItem,
-            barItem,
-            menuBarIconItem,
-            menubarFontItem,
-            monoFontItem,
-            openConfigItem,
-            reloadItem,
-            copyDiagnosticsItem,
-            quitItem,
+            pauseItem, retileItem, restoreItem, openAccessibilityItem, recheckAccessibilityItem,
+            preferencesItem, renameItem, openConfigItem, reloadItem, copyDiagnosticsItem, quitItem,
         ] {
             item.target = self
         }
@@ -73,14 +60,8 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         menu.addItem(openAccessibilityItem)
         menu.addItem(recheckAccessibilityItem)
         menu.addItem(configSeparator)
-        let fontMenu = NSMenu()
-        fontMenu.addItem(menubarFontItem)
-        fontMenu.addItem(monoFontItem)
-        barFontItem.submenu = fontMenu
-
-        menu.addItem(barItem)
-        menu.addItem(menuBarIconItem)
-        menu.addItem(barFontItem)
+        menu.addItem(preferencesItem)
+        menu.addItem(renameItem)
         menu.addItem(openConfigItem)
         menu.addItem(reloadItem)
         menu.addItem(diagnosticsSeparator)
@@ -152,25 +133,18 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         Config.openConfig()
     }
 
-    @objc private func toggleBar() {
-        Config.setChrome(bar: !Config.shared.bar)
+    @objc private func openPreferences() {
+        PreferencesWindowController.shared.show()
     }
 
-    @objc private func toggleMenuBarIcon() {
-        Config.setChrome(menuBarIcon: !Config.shared.menuBarIcon)
-    }
-
-    @objc private func useMenubarFont() {
-        Config.setBarFont(.menubar)
-    }
-
-    @objc private func useMonoFont() {
-        Config.setBarFont(.mono)
+    @objc private func renameWorkspace() {
+        WorkspaceNamer.shared.begin()
     }
 
     package func refresh() {
         lastState = nil
         update()
+        PreferencesWindowController.syncIfVisible()
     }
 
     @objc private func copyDiagnosticReport() {
@@ -189,7 +163,6 @@ package final class StatusBar: NSObject, NSMenuDelegate {
 
     func update() {
         Bar.shared.update()
-        FocusBorder.shared.update()
         let ws = WorkspaceManager.shared
         let state = StatusState.capture(ws)
         guard state != lastState else { return }
@@ -271,10 +244,6 @@ package final class StatusBar: NSObject, NSMenuDelegate {
         reloadItem.isEnabled = true
         openConfigItem.isEnabled = true
         copyDiagnosticsItem.isEnabled = true
-        barItem.state = Config.shared.bar ? .on : .off
-        menuBarIconItem.state = Config.shared.menuBarIcon ? .on : .off
-        menubarFontItem.state = Config.shared.barFont == .menubar ? .on : .off
-        monoFontItem.state = Config.shared.barFont == .mono ? .on : .off
     }
 
     private func stateSummaryTitle() -> String {
@@ -440,7 +409,7 @@ private struct StatusState: Equatable {
                 hotkeyIssueCount: Hotkeys.shared.issueCount,
                 tilingPaused: ws.isTilingPaused,
                 monitorCount: 0, focusedMonitorIndex: 0, activeWorkspace: 0,
-                activeLayout: .tile, occupiedWorkspaces: [], activeWindowCount: 0,
+                activeLayout: .initial, occupiedWorkspaces: [], activeWindowCount: 0,
                 masterRatio: Config.shared.masterRatio
             )
         }
@@ -625,7 +594,8 @@ private final class StatusContentView: NSView {
                 width: badgeRect.maxX - iconRect.maxX - 3,
                 height: badgeRect.height
             )
-            drawCenteredText("\(windowCount)", in: textRect, font: font.withSize(fontSize - 1), color: badgeColor, ctx: ctx)
+            drawCenteredText(
+                "\(windowCount)", in: textRect, font: font.withSize(fontSize - 1), color: badgeColor, ctx: ctx)
         }
     }
 

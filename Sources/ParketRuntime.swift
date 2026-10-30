@@ -56,6 +56,7 @@ package final class ParketRuntime {
             "runtime: \(isRunning ? "running" : "waiting")",
             "tiling: \(ws.isTilingPaused ? "paused" : "enabled")",
             "config_path: \(Config.path)",
+            "config_loaded: \(Config.loadedFromFile ? "yes" : "no")",
             "workspace_count: \(Config.shared.workspaceCount)",
             "focus_follows_mouse: \(Config.shared.focusFollowsMouse)",
             "bar: \(Config.shared.bar ? "on" : "off")",
@@ -115,6 +116,7 @@ package final class ParketRuntime {
     }
 
     package func reloadConfig() {
+        WorkspaceNamer.shared.cancel()
         let barWas = Config.shared.bar
         Config.load()
         StatusBar.shared.applyVisibility()
@@ -144,6 +146,7 @@ package final class ParketRuntime {
         WindowObserver.shared.start()
         registerScreenObserver()
         Hotkeys.shared.start()
+        FocusBorder.shared.start()
         MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
         DesktopBackground.shared.start()
         isRunning = true
@@ -152,6 +155,7 @@ package final class ParketRuntime {
 
     private func enterWaitingState() {
         Hotkeys.shared.stop()
+        FocusBorder.shared.stop()
         MouseFocus.shared.stop()
         isRunning = false
     }

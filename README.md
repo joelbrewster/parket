@@ -46,13 +46,18 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + H` / `Option + L` | Shrink or grow the master column |
 | `Option + B` | Show or hide the top bar |
 | `Option + Shift + C` | Reload config |
+| `Option + N` | Rename the current workspace |
 | `Option + Shift + Return` | Spawn a new window of the configured terminal |
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
 | `Option + Shift + ,` / `Option + Shift + .` | Move window to previous or next monitor |
 
+Right-click the bar or menu extra and choose Settings for appearance, tiling, modifier, and terminal. Config is for keymaps, rules, and custom binds.
+
+Control+Option+Command is an alias for Option on every bind; add Shift for the move/spawn binds. Set `hyper = false` to turn that off.
+
 Command+Tab remains the macOS app switcher. If it selects a window on another parket workspace, parket opens that workspace and focuses the selected window.
 
-Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Open Config, Copy Diagnostic Report, Reload Config.
+Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Settings, Open Config, Copy Diagnostic Report, Reload Config.
 
 ## Model
 
@@ -67,21 +72,24 @@ Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Open Conf
 
 Edit `~/.config/parket/config.toml`. All fields are optional.
 
+Appearance, tiling, modifier, and terminal live in Settings. `config.toml` is for keymaps, rules, and custom binds. UI keys in the file apply until you change them in Settings.
+
 ```toml
 workspace_count = 10
-master_ratio = 0.55
+master_ratio = 0.45
 modifier = "option"
-workspace_letter_keys = false  # true also binds q-p to workspaces 1-10
-focus_follows_mouse = false    # true focuses the window the pointer moves onto
-bar = true                     # false hides the overlay bar; right-click the bar or menu extra
-menu_bar_icon = true           # false hides the menu bar extra
-bar_font = "menubar"           # "menubar" or "mono" (Yakshaven)
-bar_highlight = "fill"         # "fill", "outline", or "text" for the selected window title
-bar_tag_highlight = "fill"     # same options for workspace numbers; omit to follow bar_highlight
+hyper = true                   # also bind control+option+command (and +shift) to the same actions
+workspace_letter_keys = true   # also binds q-p to workspaces 1-10
+focus_follows_mouse = true     # focuses the window the pointer moves onto
+bar = true                     # false hides the overlay bar; Settings stays in the bar or menu extra
+menu_bar_icon = false          # true shows the menu bar extra
+bar_font = "mono"              # "menubar" or "mono" (Yakshaven)
+bar_highlight = "text"         # "text", "fill", or "outline" for the selected window title
+bar_tag_highlight = "text"     # same options for workspace numbers; omit to follow bar_highlight
 bar_gap = 0                    # extra space under the bar
 border_width = 2
-border_radius = 8
-terminal = ""                  # app name or bundle id; empty uses the macOS default terminal
+border_radius = 6
+terminal = "Ghostty"           # app name or bundle id; empty uses the macOS default terminal
 
 [bindings]
 focus_next = "j"
@@ -99,6 +107,7 @@ move_monitor_prev = "shift+comma"
 move_monitor_next = "shift+period"
 last_workspace = "tab"
 reload_config = "shift+c"
+rename_workspace = "n"
 
 [[rules]]
 app = "Finder"

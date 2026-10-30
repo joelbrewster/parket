@@ -29,6 +29,9 @@ struct ConfigTests {
         #expect(config.modifier == .control)
         let alt = try #require(Config.parse("modifier = \"alt\""))
         #expect(alt.modifier == .option)
+        #expect(Config().hyper)
+        let hyperOff = try #require(Config.parse("hyper = false"))
+        #expect(!hyperOff.hyper)
         #expect(config.bindings.focusNext.key == Key.l)
         #expect(config.bindings.moveMonitorPrev.shift)
         #expect(config.customBindings.count == 1)
@@ -68,23 +71,23 @@ struct ConfigTests {
         #expect(tooLarge.workspaceCount == 10)
     }
 
-    @Test func focusFollowsMouseDefaultOffAndParse() throws {
-        #expect(!Config().focusFollowsMouse)
-        let config = try #require(Config.parse("focus_follows_mouse = true"))
-        #expect(config.focusFollowsMouse)
+    @Test func focusFollowsMouseDefaultOnAndParsesOff() throws {
+        #expect(Config().focusFollowsMouse)
+        let config = try #require(Config.parse("focus_follows_mouse = false"))
+        #expect(!config.focusFollowsMouse)
     }
 
     @Test func barDefaultsOnAndParsesOff() throws {
         #expect(Config().bar)
-        #expect(Config().menuBarIcon)
-        let hidden = try #require(Config.parse("bar = false\nmenu_bar_icon = false"))
+        #expect(!Config().menuBarIcon)
+        let hidden = try #require(Config.parse("bar = false\nmenu_bar_icon = true"))
         #expect(!hidden.bar)
-        #expect(!hidden.menuBarIcon)
+        #expect(hidden.menuBarIcon)
     }
 
-    @Test func barHighlightDefaultsFillAndParsesOutline() throws {
-        #expect(Config().barHighlight == .fill)
-        #expect(Config().barTagHighlight == .fill)
+    @Test func barHighlightDefaultsTextAndParsesOutline() throws {
+        #expect(Config().barHighlight == .text)
+        #expect(Config().barTagHighlight == .text)
         let outline = try #require(Config.parse("bar_highlight = \"outline\""))
         #expect(outline.barHighlight == .outline)
         #expect(outline.barTagHighlight == .outline)
@@ -93,36 +96,61 @@ struct ConfigTests {
         let text = try #require(Config.parse("bar_highlight = \"outline\"\nbar_tag_highlight = \"text\""))
         #expect(text.barHighlight == .outline)
         #expect(text.barTagHighlight == .text)
+        let bare = try #require(Config.parse("bar_highlight = text\nbar_tag_highlight = text"))
+        #expect(bare.barHighlight == .text)
+        #expect(bare.barTagHighlight == .text)
+        let mixed = try #require(Config.parse("bar_highlight = \"text\"\nbar_tag_highlight = \"outline\""))
+        #expect(mixed.barHighlight == .text)
+        #expect(mixed.barTagHighlight == .outline)
     }
 
-    @Test func barFontDefaultsMenubarAndParsesMono() throws {
-        #expect(Config().barFont == .menubar)
-        let mono = try #require(Config.parse("bar_font = \"mono\""))
-        #expect(mono.barFont == .mono)
+    @Test func barFontDefaultsMonoAndParsesMenubar() throws {
+        #expect(Config().barFont == .mono)
+        let menubar = try #require(Config.parse("bar_font = \"menubar\""))
+        #expect(menubar.barFont == .menubar)
         let alias = try #require(Config.parse("bar_font = \"monospace\""))
         #expect(alias.barFont == .mono)
     }
 
     @Test func borderWidthAndRadiusParse() throws {
         #expect(Config().borderWidth == 2)
-        #expect(Config().borderRadius == 8)
+        #expect(Config().borderRadius == 6)
         let config = try #require(Config.parse("border_width = 3\nborder_radius = 8"))
         #expect(config.borderWidth == 3)
         #expect(config.borderRadius == 8)
     }
 
-    @Test func terminalParsesAppName() throws {
-        #expect(Config().terminal.isEmpty)
-        let config = try #require(Config.parse("terminal = \"Ghostty\""))
-        #expect(config.terminal == "Ghostty")
-        let bundle = try #require(Config.parse("terminal = \"com.mitchellh.ghostty\""))
-        #expect(bundle.terminal == "com.mitchellh.ghostty")
+    @Test func workspaceNamesParseByNumber() throws {
+        #expect(Config().workspaceNames.isEmpty)
+        let config = try #require(
+            Config.parse(
+                """
+                [workspace_names]
+                2 = "main"
+                5 = "notes"
+                99 = "nope"
+                """
+            )
+        )
+        #expect(config.workspaceNames[1] == "main")
+        #expect(config.workspaceNames[4] == "notes")
+        #expect(config.workspaceNames[98] == nil)
     }
 
-    @Test func workspaceLetterKeysDefaultOffAndParse() throws {
-        #expect(!Config().workspaceLetterKeys)
-        let config = try #require(Config.parse("workspace_letter_keys = true"))
-        #expect(config.workspaceLetterKeys)
+    @Test func terminalParsesAppName() throws {
+        #expect(Config().terminal == "Ghostty")
+        let config = try #require(Config.parse("terminal = \"Kitty\""))
+        #expect(config.terminal == "Kitty")
+        let bundle = try #require(Config.parse("terminal = \"com.mitchellh.ghostty\""))
+        #expect(bundle.terminal == "com.mitchellh.ghostty")
+        let empty = try #require(Config.parse("terminal = \"\""))
+        #expect(empty.terminal.isEmpty)
+    }
+
+    @Test func workspaceLetterKeysDefaultOnAndParse() throws {
+        #expect(Config().workspaceLetterKeys)
+        let config = try #require(Config.parse("workspace_letter_keys = false"))
+        #expect(!config.workspaceLetterKeys)
     }
 
     @Test func unknownKeysDoNotCrashOrCorruptDefaults() throws {

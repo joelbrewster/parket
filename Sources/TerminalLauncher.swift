@@ -13,6 +13,18 @@ enum TerminalLauncher {
         }
     }
 
+    static func installedNames() -> [String] {
+        ["Ghostty", "Terminal", "iTerm", "Kitty", "Alacritty", "Warp", "WezTerm"].filter(exists)
+    }
+
+    private static func exists(_ name: String) -> Bool {
+        let appName = name.hasSuffix(".app") ? name : "\(name).app"
+        for folder in ["/Applications", NSHomeDirectory() + "/Applications", "/System/Applications/Utilities"] {
+            if FileManager.default.fileExists(atPath: "\(folder)/\(appName)") { return true }
+        }
+        return false
+    }
+
     private static func configuredApp() -> URL? {
         let name = Config.shared.terminal
         guard !name.isEmpty else { return nil }

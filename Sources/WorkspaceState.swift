@@ -228,7 +228,7 @@ package struct MonitorWorkspaceState<Element: Equatable>: Equatable {
 
         if count > old {
             workspaces.append(contentsOf: Array(repeating: [], count: count - old))
-            layouts.append(contentsOf: Array(repeating: .tile, count: count - old))
+            layouts.append(contentsOf: Array(repeating: .initial, count: count - old))
             focusedIndices.append(contentsOf: Array(repeating: 0, count: count - old))
         } else {
             let overflow = workspaces[count..<old].joined()

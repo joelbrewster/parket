@@ -16,122 +16,214 @@ package enum FocusBorderLayout {
 package final class FocusBorder {
     package static let shared = FocusBorder()
 
-    private static let settleTolerance: CGFloat = 6
-    private static let revealInterval: TimeInterval = 0.05
-    private static let revealMaxAttempts = 40
-    private static let concealDuration: TimeInterval = 0.2
+    private static let settleTolerance: CGFloat = 10
+    private static let idleDelay: TimeInterval = 0.12
+    private static let fadeInDuration: TimeInterval = 0.1
+    private static let fadeOutDuration: TimeInterval = 0.06
+    private static let maxSettleAttempts = 20
 
-    private var outline: FocusBorderPanel?
-    private var revealWork: DispatchWorkItem?
-    private var revealAttempts = 0
-    private var concealUntil: TimeInterval = 0
+    private var panel: FocusBorderPanel?
+    private let revealDebounce = Debounce()
+    private var generation: UInt64 = 0
+    private var settleAttempts = 0
+    private var dragging = false
+    private var globalMonitor: Any?
+    private var localMonitor: Any?
 
     private init() {}
 
+    package func start() {
+        guard globalMonitor == nil else { return }
+        let mask: NSEvent.EventTypeMask = [
+            .leftMouseDown, .leftMouseUp, .leftMouseDragged,
+            .rightMouseDown, .rightMouseUp,
+        ]
+        globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { event in
+            MainActor.assumeIsolated {
+                FocusBorder.shared.handleMouse(event)
+            }
+        }
+        localMonitor = NSEvent.addLocalMonitorForEvents(matching: mask) { event in
+            FocusBorder.shared.handleMouse(event)
+            return event
+        }
+        reveal()
+    }
+
+    package func stop() {
+        if let globalMonitor { NSEvent.removeMonitor(globalMonitor) }
+        if let localMonitor { NSEvent.removeMonitor(localMonitor) }
+        globalMonitor = nil
+        localMonitor = nil
+        dragging = false
+        cancelReveal()
+        hide(animated: false)
+        panel?.orderOut(nil)
+    }
+
     package func update() {
-        revealWork?.cancel()
-        revealWork = nil
-        revealAttempts = 0
-        apply()
+        if dragging || NSEvent.pressedMouseButtons != 0 {
+            hide(animated: true)
+            return
+        }
+        reveal()
     }
 
     package func concealUntilSettled() {
-        revealWork?.cancel()
-        revealWork = nil
-        revealAttempts = 0
-        concealUntil = ProcessInfo.processInfo.systemUptime + Self.concealDuration
-        apply()
+        if dragging || NSEvent.pressedMouseButtons != 0 {
+            hide(animated: true)
+            return
+        }
+        hide(animated: true)
+        scheduleReveal()
     }
 
     package func applyAppearance() {
-        outline?.appearance = MenuBarChrome.appearance
-        outline?.contentView?.needsDisplay = true
+        panel?.appearance = MenuBarChrome.appearance
+        panel?.contentView?.needsDisplay = true
     }
 
-    private func apply() {
-        guard let target = targetFrame() else {
-            hide()
-            return
+    private func handleMouse(_ event: NSEvent) {
+        switch event.type {
+        case .leftMouseDown, .rightMouseDown:
+            beginDrag()
+        case .leftMouseDragged:
+            if dragging { return }
+            beginDrag()
+        case .leftMouseUp, .rightMouseUp:
+            endDrag()
+        default:
+            break
         }
-        let waiting =
-            ProcessInfo.processInfo.systemUptime < concealUntil || !isSettled(to: target)
-        if waiting {
-            hide()
-            scheduleReveal()
-            return
-        }
-        show(target)
+    }
+
+    private func beginDrag() {
+        dragging = true
+        cancelReveal()
+        hide(animated: true)
+    }
+
+    private func endDrag() {
+        dragging = false
+        scheduleReveal()
+    }
+
+    private func reveal() {
+        cancelReveal()
+        settleAttempts = 0
+        tryShow()
     }
 
     private func scheduleReveal() {
-        revealAttempts += 1
-        if revealAttempts > Self.revealMaxAttempts {
-            if let target = targetFrame() {
-                show(target)
-            }
+        cancelReveal()
+        settleAttempts = 0
+        revealDebounce.schedule(after: Self.idleDelay) { [self] in
+            tryShow()
+        }
+    }
+
+    private func cancelReveal() {
+        revealDebounce.cancel()
+        generation &+= 1
+    }
+
+    private func tryShow() {
+        if dragging || NSEvent.pressedMouseButtons != 0 {
+            hide(animated: true)
             return
         }
-        let work = DispatchWorkItem { [self] in
-            apply()
+        guard let actual = actualWindowFrame() else {
+            hide(animated: true)
+            return
         }
-        revealWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.revealInterval, execute: work)
+        if let tile = tileTargetFrame(), !near(actual, tile) {
+            settleAttempts += 1
+            if settleAttempts <= Self.maxSettleAttempts {
+                hide(animated: true)
+                revealDebounce.schedule(after: Self.idleDelay) { [self] in
+                    tryShow()
+                }
+                return
+            }
+        }
+        let screens = WindowManager.screenDescriptors()
+        show(
+            ScreenGeometry.convertRect(actual, screens: screens).insetBy(
+                dx: -FocusBorderLayout.width,
+                dy: -FocusBorderLayout.width
+            ))
     }
 
     private func show(_ frame: CGRect) {
-        let panel = outline ?? FocusBorderPanel()
-        outline = panel
+        let panel = self.panel ?? FocusBorderPanel()
+        self.panel = panel
         panel.place(frame)
-        panel.orderFront(nil)
-    }
-
-    private func hide() {
-        outline?.orderOut(nil)
-    }
-
-    private func isSettled(to target: CGRect) -> Bool {
-        guard let actual = actualFrame() else { return false }
-        return abs(actual.origin.x - target.origin.x) <= Self.settleTolerance
-            && abs(actual.origin.y - target.origin.y) <= Self.settleTolerance
-            && abs(actual.width - target.width) <= Self.settleTolerance
-            && abs(actual.height - target.height) <= Self.settleTolerance
-    }
-
-    private func actualFrame() -> CGRect? {
-        guard let window = focusedWindow() else { return nil }
-        guard let ax = window.getFrame() else { return nil }
-        let frame = ScreenGeometry.convertRect(ax, screens: WindowManager.screenDescriptors())
-        return frame.insetBy(dx: -FocusBorderLayout.width, dy: -FocusBorderLayout.width)
-    }
-
-    private func targetFrame() -> CGRect? {
-        guard let window = focusedWindow() else { return nil }
-        let monitor = WorkspaceManager.shared.focusedMonitor
-        if monitor.isFloating(window) {
-            return actualFrame()
+        panel.orderFrontRegardless()
+        let gen = generation
+        if panel.alphaValue > 0.95 {
+            panel.alphaValue = 1
+            return
         }
-        let tiled = monitor.workspaces[monitor.active].filter { !monitor.isFloating($0) }
-        guard let index = tiled.firstIndex(of: window) else { return nil }
-        let frames = Tiler.calculateFrames(
-            count: tiled.count,
-            screen: monitor.tileFrame,
-            layout: monitor.layouts[monitor.active],
-            masterRatio: Config.shared.masterRatio
-        )
-        guard frames.indices.contains(index) else { return nil }
-        return ScreenGeometry.convertRect(frames[index], screens: WindowManager.screenDescriptors())
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.fadeInDuration
+            panel.animator().alphaValue = 1
+        } completionHandler: {
+            MainActor.assumeIsolated {
+                guard gen == FocusBorder.shared.generation else { return }
+                panel.alphaValue = 1
+            }
+        }
+    }
+
+    private func hide(animated: Bool) {
+        guard let panel else { return }
+        let gen = generation
+        if !animated {
+            panel.alphaValue = 0
+            return
+        }
+        guard panel.alphaValue > 0.01 else { return }
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = Self.fadeOutDuration
+            panel.animator().alphaValue = 0
+        } completionHandler: {
+            MainActor.assumeIsolated {
+                guard gen == FocusBorder.shared.generation else { return }
+                panel.alphaValue = 0
+            }
+        }
+    }
+
+    private func near(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
+        abs(lhs.origin.x - rhs.origin.x) <= Self.settleTolerance
+            && abs(lhs.origin.y - rhs.origin.y) <= Self.settleTolerance
+            && abs(lhs.width - rhs.width) <= Self.settleTolerance
+            && abs(lhs.height - rhs.height) <= Self.settleTolerance
+    }
+
+    private func actualWindowFrame() -> CGRect? {
+        focusedWindow()?.getFrame()
+    }
+
+    private func tileTargetFrame() -> CGRect? {
+        guard let window = focusedWindow() else { return nil }
+        let ws = WorkspaceManager.shared
+        let monitor = ws.monitors.first { $0.containsWindow(window) } ?? ws.focusedMonitor
+        return monitor.placedFrame(for: window)
     }
 
     private func focusedWindow() -> TrackedWindow? {
         let ws = WorkspaceManager.shared
         guard !ws.isTilingPaused, !ws.monitors.isEmpty else { return nil }
+        if let focused = WindowManager.focusedWindow(),
+            ws.monitors.contains(where: { $0.containsWindow(focused) })
+        {
+            return focused
+        }
         let monitor = ws.focusedMonitor
         guard monitor.workspaces.indices.contains(monitor.active) else { return nil }
         let windows = monitor.workspaces[monitor.active]
         guard !windows.isEmpty else { return nil }
-        if let focused = WindowManager.focusedWindow(), windows.contains(focused) {
-            return focused
-        }
         if monitor.focusedIndices.indices.contains(monitor.active) {
             let index = monitor.focusedIndices[monitor.active]
             if windows.indices.contains(index) {
@@ -150,7 +242,7 @@ private final class FocusBorderPanel: NSPanel {
             backing: .buffered,
             defer: false
         )
-        isFloatingPanel = false
+        isFloatingPanel = true
         becomesKeyOnlyIfNeeded = true
         hidesOnDeactivate = false
         isReleasedWhenClosed = false
@@ -158,11 +250,12 @@ private final class FocusBorderPanel: NSPanel {
         hasShadow = false
         isOpaque = false
         ignoresMouseEvents = true
-        level = NSWindow.Level(rawValue: NSWindow.Level.normal.rawValue + 1)
+        level = .floating
         collectionBehavior = [.canJoinAllSpaces, .stationary, .ignoresCycle, .fullScreenNone]
         animationBehavior = .none
         appearance = MenuBarChrome.appearance
         backgroundColor = .clear
+        alphaValue = 0
         titleVisibility = .hidden
         titlebarAppearsTransparent = true
         contentView = FocusBorderView()
@@ -190,7 +283,8 @@ private final class FocusBorderView: NSView {
     override var isOpaque: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        let inner = bounds.insetBy(dx: FocusBorderLayout.width, dy: FocusBorderLayout.width)
+        let inset = FocusBorderLayout.width
+        let inner = bounds.insetBy(dx: inset, dy: inset)
         let radius = min(
             Config.shared.borderRadius,
             max(0, inner.width / 2),

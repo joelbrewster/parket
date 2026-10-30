@@ -3,10 +3,12 @@ import Foundation
 package enum Layout {
     case tile
     case monocle
+
+    static let initial = Layout.monocle
 }
 
 package enum Tiler {
-    package static let defaultMasterRatio: CGFloat = 0.55
+    package static let defaultMasterRatio: CGFloat = 0.45
 
     package static func calculateFrames(
         count: Int,

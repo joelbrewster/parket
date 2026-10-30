@@ -65,6 +65,7 @@ struct HotkeyPlannerTests {
     @Test func letterKeysAliasNumberRowWhenEnabled() {
         var config = Config()
         config.customBindings = []
+        config.workspaceLetterKeys = false
 
         let off = HotkeyPlanner.plan(config: config)
         #expect(!off.registrations.contains { $0.chord.key == Key.q })
@@ -96,10 +97,15 @@ struct HotkeyPlannerTests {
         let plan = HotkeyPlanner.plan(config: config)
 
         #expect(plan.registrations.contains { $0.chord.key == Key.b && !$0.chord.shift && $0.action == .toggleBar })
-        #expect(plan.registrations.contains { $0.chord.key == Key.f && !$0.chord.shift && $0.action == .toggleFloating })
-        #expect(plan.registrations.contains { $0.chord.key == Key.h && !$0.chord.shift && $0.action == .decreaseMaster })
-        #expect(plan.registrations.contains { $0.chord.key == Key.l && !$0.chord.shift && $0.action == .increaseMaster })
+        #expect(
+            plan.registrations.contains { $0.chord.key == Key.f && !$0.chord.shift && $0.action == .toggleFloating })
+        #expect(
+            plan.registrations.contains { $0.chord.key == Key.h && !$0.chord.shift && $0.action == .decreaseMaster })
+        #expect(
+            plan.registrations.contains { $0.chord.key == Key.l && !$0.chord.shift && $0.action == .increaseMaster })
         #expect(plan.registrations.contains { $0.chord.key == Key.c && $0.chord.shift && $0.action == .reloadConfig })
+        #expect(
+            plan.registrations.contains { $0.chord.key == Key.n && !$0.chord.shift && $0.action == .renameWorkspace })
         #expect(
             plan.registrations.contains {
                 $0.chord.key == Key.return && $0.chord.shift && $0.action == .spawnTerminal

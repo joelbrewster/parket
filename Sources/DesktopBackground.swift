@@ -16,14 +16,11 @@ enum MenuBarChrome {
     }
 
     static var accent: NSColor {
-        opaque(highlight() ?? NSColor.controlAccentColor)
+        opaque(highlight() ?? .systemBlue)
     }
 
     private static func highlight() -> NSColor? {
-        UserDefaults.standard.synchronize()
-        guard let value = UserDefaults.standard.string(forKey: "AppleHighlightColor") else {
-            return nil
-        }
+        guard let value = highlightPreference() else { return nil }
         let parts = value.split(whereSeparator: \.isWhitespace).map(String.init)
         if parts.count >= 4 {
             let name = parts[3].lowercased()
@@ -34,9 +31,58 @@ enum MenuBarChrome {
         if parts.count >= 3,
             let r = Double(parts[0]), let g = Double(parts[1]), let b = Double(parts[2])
         {
+            if parts.count < 4 || parts[3].lowercased() != "other",
+                let snapped = snapThemeAccent(r: r, g: g, b: b)
+            {
+                return snapped
+            }
             return NSColor(srgbRed: r, green: g, blue: b, alpha: 1)
         }
         return nil
+    }
+
+    private static func highlightPreference() -> String? {
+        let key = "AppleHighlightColor"
+        if let value = UserDefaults.standard.string(forKey: key), !value.isEmpty {
+            return value
+        }
+        if let value = UserDefaults.standard.persistentDomain(forName: UserDefaults.globalDomain)?[key] as? String,
+            !value.isEmpty
+        {
+            return value
+        }
+        if let value = CFPreferencesCopyAppValue(key as CFString, kCFPreferencesAnyApplication) as? String,
+            !value.isEmpty
+        {
+            return value
+        }
+        return nil
+    }
+
+    private static func snapThemeAccent(r: Double, g: Double, b: Double) -> NSColor? {
+        let swatches: [(Double, Double, Double, NSColor)] = [
+            (0.000, 0.431, 0.863, .systemBlue),
+            (0.000, 0.500, 1.000, .systemBlue),
+            (0.557, 0.271, 0.678, .systemPurple),
+            (1.000, 0.412, 0.706, .systemPink),
+            (1.000, 0.388, 0.314, .systemRed),
+            (1.000, 0.584, 0.000, .systemOrange),
+            (1.000, 0.875, 0.569, .systemYellow),
+            (0.753, 0.965, 0.678, .systemGreen),
+            (0.765, 0.977, 0.569, .systemGreen),
+            (0.557, 0.557, 0.576, .systemGray),
+        ]
+        var best: (Double, NSColor)?
+        for swatch in swatches {
+            let distance = (r - swatch.0) * (r - swatch.0)
+                + (g - swatch.1) * (g - swatch.1)
+                + (b - swatch.2) * (b - swatch.2)
+            if best == nil || distance < best!.0 {
+                best = (distance, swatch.3)
+            }
+        }
+        guard let best, best.0 <= 0.08 else { return nil }
+        return best.1
     }
 
     private static func themeAccent(named name: String) -> NSColor? {

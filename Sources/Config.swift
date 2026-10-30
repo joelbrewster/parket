@@ -185,16 +185,19 @@ package struct BuiltinBindings {
     var moveMonitorNext: (key: UInt16, shift: Bool) = (Key.period, true)
     var lastWorkspace: (key: UInt16, shift: Bool) = (Key.tab, false)
     var reloadConfig: (key: UInt16, shift: Bool) = (Key.c, true)
+    var renameWorkspace: (key: UInt16, shift: Bool) = (Key.n, false)
 }
 
 package struct Config {
     package static let defaultWorkspaceCount = 10
-    package static let defaultMasterRatio: CGFloat = 0.55
+    package static let defaultMasterRatio: CGFloat = 0.45
     package static let masterRatioStep: CGFloat = 0.05
     package static let minMasterRatio: CGFloat = 0.1
     package static let maxMasterRatio: CGFloat = 0.9
     @MainActor
     package static var shared = Config()
+    @MainActor
+    package static var loadedFromFile = false
     package static var path: String {
         NSString("~/.config/parket/config.toml").expandingTildeInPath
     }
@@ -205,17 +208,19 @@ package struct Config {
     package var workspaceCount: Int = defaultWorkspaceCount
     package var masterRatio: CGFloat = defaultMasterRatio
     package var modifier: HotkeyModifier = .option
-    package var workspaceLetterKeys = false
-    package var focusFollowsMouse = false
+    package var hyper = true
+    package var workspaceLetterKeys = true
+    package var focusFollowsMouse = true
     package var bar = true
-    package var menuBarIcon = true
-    package var barFont: BarFont = .menubar
-    package var barHighlight: BarHighlight = .fill
-    package var barTagHighlight: BarHighlight = .fill
+    package var menuBarIcon = false
+    package var barFont: BarFont = .mono
+    package var barHighlight: BarHighlight = .text
+    package var barTagHighlight: BarHighlight = .text
     package var barGap: CGFloat = 0
     package var borderWidth: CGFloat = 2
-    package var borderRadius: CGFloat = 8
-    package var terminal = ""
+    package var borderRadius: CGFloat = 6
+    package var terminal = "Ghostty"
+    package var workspaceNames: [Int: String] = [:]
     package var customBindings: [Binding] = []
     package var rules: [AppRule] = []
     package var bindings = BuiltinBindings()
@@ -241,17 +246,53 @@ package struct Config {
 
     @MainActor
     package static func load() {
-        guard FileManager.default.fileExists(atPath: path) else { return }
+        loadedFromFile = false
+        seedHomeConfigIfNeeded()
+        guard FileManager.default.fileExists(atPath: path) else {
+            fputs("parket: no config at \(path)\n", stderr)
+            applyUIPreferences()
+            return
+        }
 
         guard let data = FileManager.default.contents(atPath: path),
             let text = String(data: data, encoding: .utf8)
         else {
             fputs("parket: failed to read config file\n", stderr)
+            applyUIPreferences()
             return
         }
 
-        guard let config = parse(text, report: { fputs("parket: \($0)\n", stderr) }) else { return }
+        guard let config = parse(text, report: { fputs("parket: \($0)\n", stderr) }) else {
+            applyUIPreferences()
+            return
+        }
         shared = config
+        loadedFromFile = true
+        applyUIPreferences()
+        fputs("parket: loaded \(path)\n", stderr)
+    }
+
+    @MainActor
+    private static func seedHomeConfigIfNeeded() {
+        guard !FileManager.default.fileExists(atPath: path) else { return }
+        let manager = FileManager.default
+        var candidates: [URL] = []
+        if let bundled = Bundle.main.url(forResource: "config", withExtension: "toml") {
+            candidates.append(bundled)
+        }
+        candidates.append(
+            Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("config.toml")
+        )
+        for source in candidates {
+            guard manager.fileExists(atPath: source.path) else { continue }
+            let directory = url.deletingLastPathComponent()
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+            try? manager.copyItem(at: source, to: url)
+            if manager.fileExists(atPath: path) {
+                fputs("parket: seeded config from \(source.path)\n", stderr)
+                return
+            }
+        }
     }
 
     package static func parse(_ text: String, report: (String) -> Void = { _ in }) -> Config? {
@@ -272,6 +313,10 @@ package struct Config {
 
         if let ratio = toml["master_ratio"] as? Double, ratio > 0, ratio < 1 {
             config.masterRatio = CGFloat(ratio)
+        }
+
+        if let hyper = toml["hyper"] as? Bool {
+            config.hyper = hyper
         }
 
         if let letterKeys = toml["workspace_letter_keys"] as? Bool {
@@ -318,7 +363,7 @@ package struct Config {
                 config.barHighlight = value
                 config.barTagHighlight = value
             } else {
-                report("unknown bar_highlight '\(highlight)', using fill")
+                report("unknown bar_highlight '\(highlight)', using text")
             }
         }
 
@@ -363,6 +408,18 @@ package struct Config {
             applyBinding(bindings, "move_monitor_next", to: &config.bindings.moveMonitorNext, report: report)
             applyBinding(bindings, "last_workspace", to: &config.bindings.lastWorkspace, report: report)
             applyBinding(bindings, "reload_config", to: &config.bindings.reloadConfig, report: report)
+            applyBinding(bindings, "rename_workspace", to: &config.bindings.renameWorkspace, report: report)
+        }
+
+        if let names = toml["workspace_names"] as? [String: Any] {
+            for (key, value) in names {
+                guard let number = Int(key), number >= 1, number <= config.workspaceCount else { continue }
+                let name = (value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+                let cleaned = name.filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+                if !cleaned.isEmpty {
+                    config.workspaceNames[number - 1] = String(cleaned.prefix(12))
+                }
+            }
         }
 
         if let customs = toml["custom"] as? [[String: Any]] {
@@ -415,22 +472,215 @@ package struct Config {
         let barChanged = nextBar != shared.bar
         shared.bar = nextBar
         shared.menuBarIcon = nextIcon
-        upsertBool("bar", nextBar)
-        upsertBool("menu_bar_icon", nextIcon)
+        defaults.set(nextBar, forKey: uiBarKey)
+        defaults.set(nextIcon, forKey: uiMenuBarIconKey)
         StatusBar.shared.applyVisibility()
         if barChanged {
             WorkspaceManager.shared.applyChrome()
         } else {
             Bar.shared.sync(screens: NSScreen.screens)
         }
-        StatusBar.shared.update()
+        StatusBar.shared.refresh()
     }
 
     @MainActor
     package static func setBarFont(_ font: BarFont) {
         shared.barFont = font
-        upsertString("bar_font", font.rawValue)
+        defaults.set(font.rawValue, forKey: uiFontKey)
+        Bar.shared.update()
         StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setBarHighlight(_ value: BarHighlight) {
+        shared.barHighlight = value
+        defaults.set(value.rawValue, forKey: uiHighlightKey)
+        Bar.shared.update()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setBarTagHighlight(_ value: BarHighlight) {
+        shared.barTagHighlight = value
+        defaults.set(value.rawValue, forKey: uiTagHighlightKey)
+        Bar.shared.update()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setBarGap(_ value: CGFloat) {
+        shared.barGap = min(max(value, 0), 64)
+        defaults.set(Double(shared.barGap), forKey: uiBarGapKey)
+        WorkspaceManager.shared.applyCurrentConfig()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setBorderWidth(_ value: CGFloat) {
+        shared.borderWidth = min(max(value, 1), 32)
+        defaults.set(Double(shared.borderWidth), forKey: uiBorderWidthKey)
+        Bar.shared.update()
+        FocusBorder.shared.update()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setBorderRadius(_ value: CGFloat) {
+        shared.borderRadius = min(max(value, 0), 64)
+        defaults.set(Double(shared.borderRadius), forKey: uiBorderRadiusKey)
+        Bar.shared.update()
+        FocusBorder.shared.update()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setWorkspaceCount(_ count: Int) {
+        guard WorkspaceBounds.isValidCount(count) else { return }
+        shared.workspaceCount = count
+        shared.numberKeys = buildNumberKeys(count: count)
+        defaults.set(count, forKey: uiWorkspaceCountKey)
+        WorkspaceManager.shared.applyCurrentConfig()
+        Hotkeys.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setMasterRatio(_ value: CGFloat) {
+        let next = min(max(value, minMasterRatio), maxMasterRatio)
+        shared.masterRatio = next
+        defaults.set(Double(next), forKey: uiMasterRatioKey)
+        WorkspaceManager.shared.retileNow()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setModifier(_ value: HotkeyModifier) {
+        shared.modifier = value
+        defaults.set(value.rawValue, forKey: uiModifierKey)
+        Hotkeys.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setHyper(_ value: Bool) {
+        shared.hyper = value
+        defaults.set(value, forKey: uiHyperKey)
+        Hotkeys.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setWorkspaceLetterKeys(_ value: Bool) {
+        shared.workspaceLetterKeys = value
+        defaults.set(value, forKey: uiLetterKeysKey)
+        Hotkeys.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setFocusFollowsMouse(_ value: Bool) {
+        shared.focusFollowsMouse = value
+        defaults.set(value, forKey: uiFocusFollowsMouseKey)
+        MouseFocus.shared.apply(enabled: value)
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setTerminal(_ value: String) {
+        shared.terminal = value
+        defaults.set(value, forKey: uiTerminalKey)
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func applyUIPreferences() {
+        if let value = bool(uiBarKey) { shared.bar = value }
+        if let value = bool(uiMenuBarIconKey) { shared.menuBarIcon = value }
+        if let raw = defaults.string(forKey: uiFontKey) {
+            switch raw {
+            case "menubar", "menu":
+                shared.barFont = .menubar
+            case "mono", "monospace":
+                shared.barFont = .mono
+            default:
+                break
+            }
+        }
+        if let raw = defaults.string(forKey: uiHighlightKey), let value = parseHighlight(raw) {
+            shared.barHighlight = value
+        }
+        if let raw = defaults.string(forKey: uiTagHighlightKey), let value = parseHighlight(raw) {
+            shared.barTagHighlight = value
+        }
+        if let value = number(uiBarGapKey), value >= 0, value <= 64 { shared.barGap = value }
+        if let value = number(uiBorderWidthKey), value > 0, value <= 32 { shared.borderWidth = value }
+        if let value = number(uiBorderRadiusKey), value >= 0, value <= 64 { shared.borderRadius = value }
+        if let count = int(uiWorkspaceCountKey), WorkspaceBounds.isValidCount(count) {
+            shared.workspaceCount = count
+            shared.numberKeys = buildNumberKeys(count: count)
+        }
+        if let value = number(uiMasterRatioKey), value > 0, value < 1 { shared.masterRatio = value }
+        if let raw = defaults.string(forKey: uiModifierKey) {
+            switch raw {
+            case "option", "alt", "opt":
+                shared.modifier = .option
+            case "control", "ctrl":
+                shared.modifier = .control
+            case "command", "cmd":
+                shared.modifier = .command
+            default:
+                break
+            }
+        }
+        if let value = bool(uiHyperKey) { shared.hyper = value }
+        if let value = bool(uiLetterKeysKey) { shared.workspaceLetterKeys = value }
+        if let value = bool(uiFocusFollowsMouseKey) { shared.focusFollowsMouse = value }
+        if defaults.object(forKey: uiTerminalKey) != nil {
+            shared.terminal = defaults.string(forKey: uiTerminalKey) ?? ""
+        }
+    }
+
+    private static var defaults: UserDefaults { UserDefaults.standard }
+
+    private static let uiBarKey = "parket.bar"
+    private static let uiMenuBarIconKey = "parket.menuBarIcon"
+    private static let uiFontKey = "parket.barFont"
+    private static let uiHighlightKey = "parket.barHighlight"
+    private static let uiTagHighlightKey = "parket.barTagHighlight"
+    private static let uiBarGapKey = "parket.barGap"
+    private static let uiBorderWidthKey = "parket.borderWidth"
+    private static let uiBorderRadiusKey = "parket.borderRadius"
+    private static let uiWorkspaceCountKey = "parket.workspaceCount"
+    private static let uiMasterRatioKey = "parket.masterRatio"
+    private static let uiModifierKey = "parket.modifier"
+    private static let uiHyperKey = "parket.hyper"
+    private static let uiLetterKeysKey = "parket.letterKeys"
+    private static let uiFocusFollowsMouseKey = "parket.focusFollowsMouse"
+    private static let uiTerminalKey = "parket.terminal"
+
+    private static func bool(_ key: String) -> Bool? {
+        defaults.object(forKey: key) == nil ? nil : defaults.bool(forKey: key)
+    }
+
+    private static func int(_ key: String) -> Int? {
+        defaults.object(forKey: key) == nil ? nil : defaults.integer(forKey: key)
+    }
+
+    private static func number(_ key: String) -> CGFloat? {
+        defaults.object(forKey: key) == nil ? nil : CGFloat(defaults.double(forKey: key))
+    }
+
+    @MainActor
+    package static func setWorkspaceName(_ index: Int, _ name: String) {
+        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            .filter { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" }
+        let clipped = String(cleaned.prefix(12))
+        if clipped.isEmpty {
+            shared.workspaceNames.removeValue(forKey: index)
+        } else {
+            shared.workspaceNames[index] = clipped
+        }
+        writeWorkspaceNames()
     }
 
     @MainActor
@@ -439,8 +689,9 @@ package struct Config {
         let next = min(max(stepped, minMasterRatio), maxMasterRatio)
         guard abs(next - shared.masterRatio) > 0.0001 else { return }
         shared.masterRatio = next
-        upsertNumber("master_ratio", next)
+        defaults.set(Double(next), forKey: uiMasterRatioKey)
         WorkspaceManager.shared.retileNow()
+        StatusBar.shared.refresh()
     }
 
     private static func upsertBool(_ key: String, _ value: Bool) {
@@ -552,7 +803,7 @@ package struct Config {
     }
 
     private static func parseHighlight(_ value: String) -> BarHighlight? {
-        switch value {
+        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
         case "fill", "solid":
             return .fill
         case "outline", "border", "stroke":
@@ -589,18 +840,20 @@ package struct Config {
     private static var defaultConfigText: String {
         """
         workspace_count = 10
-        master_ratio = 0.55
+        master_ratio = 0.45
         modifier = "option"
-        workspace_letter_keys = false
-        focus_follows_mouse = false
+        hyper = true
+        workspace_letter_keys = true
+        focus_follows_mouse = true
         bar = true
-        menu_bar_icon = true
-        bar_font = "menubar"
-        bar_highlight = "fill"
-        bar_tag_highlight = "fill"
+        menu_bar_icon = false
+        bar_font = "mono"
+        bar_highlight = "text"
+        bar_tag_highlight = "text"
         bar_gap = 0
         border_width = 2
-        border_radius = 8
+        border_radius = 6
+        terminal = "Ghostty"
 
         [bindings]
         focus_next = "j"
@@ -618,6 +871,44 @@ package struct Config {
         move_monitor_next = "shift+period"
         last_workspace = "tab"
         reload_config = "shift+c"
+        rename_workspace = "n"
         """
+    }
+
+    @MainActor
+    private static func writeWorkspaceNames() {
+        let manager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        if !manager.fileExists(atPath: directory.path) {
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
+        text = stripSection(text, named: "workspace_names")
+        let rows = shared.workspaceNames.keys.sorted().compactMap { index -> String? in
+            guard let name = shared.workspaceNames[index], !name.isEmpty else { return nil }
+            return "\(index + 1) = \"\(name)\""
+        }
+        if !rows.isEmpty {
+            if !text.hasSuffix("\n") { text += "\n" }
+            text += "\n[workspace_names]\n" + rows.joined(separator: "\n") + "\n"
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
+    private static func stripSection(_ text: String, named name: String) -> String {
+        var result: [String] = []
+        var skipping = false
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let header = line.prefix(while: { $0 != "#" }).trimmingCharacters(in: .whitespaces)
+            if header.hasPrefix("["), header.hasSuffix("]") {
+                skipping = header == "[\(name)]"
+            }
+            if skipping { continue }
+            result.append(String(line))
+        }
+        while result.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            result.removeLast()
+        }
+        return result.joined(separator: "\n")
     }
 }

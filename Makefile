@@ -56,6 +56,12 @@ sync: dist
 	mkdir -p $(SYNC_DIR)
 	rm -rf $(SYNC_BUNDLE)
 	ditto $(BUNDLE) $(SYNC_BUNDLE)
+	@if [ -f "$(HOME)/.config/parket/config.toml" ]; then \
+		mkdir -p $(SYNC_BUNDLE)/Contents/Resources; \
+		cp "$(HOME)/.config/parket/config.toml" $(SYNC_BUNDLE)/Contents/Resources/config.toml; \
+		cp "$(HOME)/.config/parket/config.toml" $(SYNC_DIR)/config.toml; \
+		codesign --force --sign "$(CODESIGN_IDENTITY)" --requirements '$(CODESIGN_REQUIREMENTS)' $(SYNC_BUNDLE); \
+	fi
 	@echo "copied $(SYNC_BUNDLE)"
 
 verify-dist:

@@ -7,7 +7,7 @@ package final class MouseFocus {
     private static let settleDelay: TimeInterval = 0.05
 
     private var eventMonitor: Any?
-    private var pendingCheck: DispatchWorkItem?
+    private let checkDebounce = Debounce()
     private var lastHovered: TrackedWindow?
 
     private init() {}
@@ -25,8 +25,7 @@ package final class MouseFocus {
             NSEvent.removeMonitor(eventMonitor)
         }
         eventMonitor = nil
-        pendingCheck?.cancel()
-        pendingCheck = nil
+        checkDebounce.cancel()
         lastHovered = nil
     }
 
@@ -40,15 +39,9 @@ package final class MouseFocus {
     }
 
     private func scheduleCheck() {
-        pendingCheck?.cancel()
-        let work = DispatchWorkItem {
-            MainActor.assumeIsolated {
-                MouseFocus.shared.pendingCheck = nil
-                MouseFocus.shared.focusWindowUnderPointer()
-            }
+        checkDebounce.schedule(after: Self.settleDelay) {
+            MouseFocus.shared.focusWindowUnderPointer()
         }
-        pendingCheck = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.settleDelay, execute: work)
     }
 
     private func focusWindowUnderPointer() {

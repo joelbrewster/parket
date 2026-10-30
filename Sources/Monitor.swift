@@ -9,11 +9,10 @@ enum WindowUpdate {
 
 @MainActor
 package final class Monitor {
-    private static let geometryDebounceDelay: TimeInterval = 0.08
-    private static let geometrySuppressionDelay: TimeInterval = 0.20
-    private static let scheduledRetileDelay: TimeInterval = 0.025
+    private static let retileDelay: TimeInterval = 0.05
+    private static let geometrySuppressionDelay: TimeInterval = 0.16
     private static let frameTolerance: CGFloat = 2.0
-    private static let windowSettleStepDelay: TimeInterval = 0.30
+    private static let windowSettleStepDelay: TimeInterval = 0.08
     private static let windowSettleMaxSteps = 8
 
     let displayID: CGDirectDisplayID
@@ -21,14 +20,13 @@ package final class Monitor {
     var tileFrame: CGRect
     private let offscreenContext: OffscreenWindowPlacementContext
     var workspaces: [[TrackedWindow]] = Array(repeating: [], count: Config.shared.workspaceCount)
-    var layouts: [Layout] = Array(repeating: .tile, count: Config.shared.workspaceCount)
+    var layouts: [Layout] = Array(repeating: .initial, count: Config.shared.workspaceCount)
     var focusedIndices: [Int] = Array(repeating: 0, count: Config.shared.workspaceCount)
     private var floating: Set<WindowGroupKey> = []
     private var floatingFrames: [WindowGroupKey: CGRect] = [:]
     var active: Int = 0
     var previousActive: Int = 0
-    private var retileScheduled = false
-    private var geometryRetileWork: DispatchWorkItem?
+    private let retileDebounce = Debounce()
     private var ignoreGeometryUntil: TimeInterval = 0
     private var geometryOperationGeneration: UInt64 = 0
     private var focusRestoreGeneration: UInt64 = 0
@@ -261,6 +259,15 @@ package final class Monitor {
         workspaces.contains { $0.contains(window) }
     }
 
+    func placedFrame(for window: TrackedWindow) -> CGRect? {
+        if isFloating(window) { return nil }
+        let tiled = workspaces[active].filter { !isFloating($0) }
+        guard let index = tiled.firstIndex(of: window) else { return nil }
+        let frames = placedWindowFrames(windowCount: tiled.count)
+        guard frames.indices.contains(index) else { return nil }
+        return frames[index]
+    }
+
     func focusNext() { focusOffset(1) }
     func focusPrev() { focusOffset(-1) }
 
@@ -340,33 +347,28 @@ package final class Monitor {
     }
 
     private func scheduleRetile() {
-        guard !WorkspaceManager.shared.isTilingPaused else { return }
-        guard !retileScheduled else { return }
-        retileScheduled = true
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.scheduledRetileDelay) { [self] in
-            retileScheduled = false
-            retile(validate: false)
-        }
+        enqueueRetile(corrective: false)
     }
 
     func scheduleCorrectiveRetile() {
-        guard !WorkspaceManager.shared.isTilingPaused else { return }
         guard !shouldSuppressGeometryNotification() else { return }
+        enqueueRetile(corrective: true)
+    }
 
-        geometryRetileWork?.cancel()
+    private func enqueueRetile(corrective: Bool) {
+        guard !WorkspaceManager.shared.isTilingPaused else { return }
         let scheduledActive = active
         let scheduledGeneration = geometryOperationGeneration
-        let work = DispatchWorkItem { [self] in
-            geometryRetileWork = nil
+        retileDebounce.schedule(after: Self.retileDelay) { [self] in
             guard active == scheduledActive else { return }
             guard geometryOperationGeneration == scheduledGeneration else { return }
-            guard ProcessInfo.processInfo.systemUptime >= ignoreGeometryUntil else { return }
-            guard !activeWorkspaceMatchesLayout(tolerance: Self.frameTolerance) else { return }
-            invalidateActiveWorkspaceAppliedGeometry()
+            if corrective {
+                guard ProcessInfo.processInfo.systemUptime >= ignoreGeometryUntil else { return }
+                guard !activeWorkspaceMatchesLayout(tolerance: Self.frameTolerance) else { return }
+                invalidateActiveWorkspaceAppliedGeometry()
+            }
             retile(validate: false)
         }
-        geometryRetileWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.geometryDebounceDelay, execute: work)
     }
 
     func shouldSuppressGeometryNotification() -> Bool {
@@ -413,9 +415,7 @@ package final class Monitor {
     }
 
     func cancelPendingRetile() {
-        retileScheduled = false
-        geometryRetileWork?.cancel()
-        geometryRetileWork = nil
+        retileDebounce.cancel()
         ignoreGeometryUntil = 0
         geometryOperationGeneration &+= 1
     }
@@ -682,13 +682,12 @@ package final class Monitor {
     }
 
     func resetState() {
-        geometryRetileWork?.cancel()
-        geometryRetileWork = nil
+        retileDebounce.cancel()
         ignoreGeometryUntil = 0
         geometryOperationGeneration &+= 1
         let count = Config.shared.workspaceCount
         workspaces = Array(repeating: [], count: count)
-        layouts = Array(repeating: .tile, count: count)
+        layouts = Array(repeating: .initial, count: count)
         focusedIndices = Array(repeating: 0, count: count)
         active = 0
         previousActive = 0

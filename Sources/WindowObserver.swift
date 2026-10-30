@@ -20,16 +20,16 @@ package final class WindowObserver {
     private static let maxRetries = 10
     private static let retryInterval: TimeInterval = 0.05
     private static let syncCoalesceDelay: TimeInterval = 0.06
-    private static let focusCoalesceDelay: TimeInterval = 0.015
+    private static let focusCoalesceDelay: TimeInterval = 0.02
     private static let startupReconcileDelays: [TimeInterval] = [0.25, 1.0]
     private static let windowCreatedReconcileDelays: [TimeInterval] = [0.25, 1.0]
 
     private var observers: [pid_t: AXObserver] = [:]
     private var observedWindowElements: [pid_t: [AXUIElement]] = [:]
-    private var syncWorks: [pid_t: DispatchWorkItem] = [:]
+    private let syncDebounce = DebounceMap<pid_t>()
     private var delayedSyncWorks: [pid_t: [DispatchWorkItem]] = [:]
     private var pendingSyncAllowsEmpty: [pid_t: Bool] = [:]
-    private var focusWorks: [pid_t: DispatchWorkItem] = [:]
+    private let focusDebounce = DebounceMap<pid_t>()
     private var isStarted = false
 
     private init() {}
@@ -128,12 +128,12 @@ package final class WindowObserver {
         }
         observers.removeValue(forKey: pid)
         observedWindowElements.removeValue(forKey: pid)
-        syncWorks.removeValue(forKey: pid)?.cancel()
+        syncDebounce.cancel(pid)
         for work in delayedSyncWorks.removeValue(forKey: pid) ?? [] {
             work.cancel()
         }
         pendingSyncAllowsEmpty.removeValue(forKey: pid)
-        focusWorks.removeValue(forKey: pid)?.cancel()
+        focusDebounce.cancel(pid)
     }
 
     private func handleActivateNotification(_ note: Notification) {
@@ -176,14 +176,10 @@ package final class WindowObserver {
 
     private func scheduleSyncWindows(pid: pid_t, allowEmpty: Bool) {
         pendingSyncAllowsEmpty[pid] = (pendingSyncAllowsEmpty[pid] ?? true) && allowEmpty
-        syncWorks[pid]?.cancel()
-        let work = DispatchWorkItem { [self] in
-            syncWorks.removeValue(forKey: pid)
+        syncDebounce.schedule(pid, after: Self.syncCoalesceDelay) { [self] in
             let allowEmpty = pendingSyncAllowsEmpty.removeValue(forKey: pid) ?? allowEmpty
             trySyncWindows(pid: pid, attempt: 0, allowEmpty: allowEmpty)
         }
-        syncWorks[pid] = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.syncCoalesceDelay, execute: work)
     }
 
     private func scheduleDelayedSyncWindows(pid: pid_t) {
@@ -201,13 +197,9 @@ package final class WindowObserver {
     }
 
     private func scheduleFocusFollow(pid: pid_t) {
-        focusWorks[pid]?.cancel()
-        let work = DispatchWorkItem { [self] in
-            focusWorks.removeValue(forKey: pid)
+        focusDebounce.schedule(pid, after: Self.focusCoalesceDelay) {
             WorkspaceManager.shared.followExternalFocus(pid: pid)
         }
-        focusWorks[pid] = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + Self.focusCoalesceDelay, execute: work)
     }
 
     private func observeApp(pid: pid_t) {

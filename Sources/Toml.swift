@@ -47,15 +47,17 @@ package enum Toml {
                 continue
             }
 
-            guard let eqIndex = trimmed.firstIndex(of: "=") else {
-                throw Error.parse(line: lineNumber + 1, message: "expected key = value")
-            }
+            guard let eqIndex = trimmed.firstIndex(of: "=") else { continue }
 
             let key = trimmed[trimmed.startIndex..<eqIndex].trimmingCharacters(in: .whitespaces)
             let valStr = trimmed[trimmed.index(after: eqIndex)...].trimmingCharacters(in: .whitespaces)
-            guard !key.isEmpty else { throw Error.parse(line: lineNumber + 1, message: "empty key") }
-            guard !valStr.isEmpty else { throw Error.parse(line: lineNumber + 1, message: "empty value") }
-            let value = try parseValue(valStr, line: lineNumber + 1)
+            guard !key.isEmpty, !valStr.isEmpty else { continue }
+            let value: Any
+            do {
+                value = try parseValue(valStr, line: lineNumber + 1)
+            } catch {
+                continue
+            }
 
             if let arrayTable = currentArrayTable {
                 var arr = root[arrayTable] as! [[String: Any]]
@@ -86,7 +88,10 @@ package enum Toml {
             guard let d = Double(s) else { throw Error.parse(line: line, message: "invalid float '\(s)'") }
             return d
         }
-        guard let i = Int(s) else { throw Error.parse(line: line, message: "invalid value '\(s)'") }
-        return i
+        if let i = Int(s) { return i }
+        if s.allSatisfy({ $0.isLetter || $0.isNumber || $0 == "_" || $0 == "-" || $0 == "+" }) {
+            return s
+        }
+        throw Error.parse(line: line, message: "invalid value '\(s)'")
     }
 }

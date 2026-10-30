@@ -6,37 +6,39 @@
 
 # also bind q-p to workspaces 1-10 (q=1 ... p=10)
 # note: takes over modifier+q..p, so option+e/u/i dead keys stop typing accents
-# workspace_letter_keys = false
+# workspace_letter_keys = true
 
 # focus the window under the mouse pointer when the pointer moves onto it
-# focus_follows_mouse = false
+# focus_follows_mouse = true
 
 # dwm-style bar over the macOS menu bar (default on)
 # bar = true
 
-# menu bar extra with workspace badges (default on)
-# menu_bar_icon = true
+# menu bar extra with workspace badges (default off)
+# menu_bar_icon = false
 
 # bar typeface: "menubar" (macOS menu bar) or "mono" (Yakshaven)
-# bar_font = "menubar"
+# bar_font = "mono"
 
-# selected window title: "fill", "outline", or "text" (accent-coloured text, no box)
-# bar_highlight = "fill"
+# selected window title: "text" (accent-coloured text, no box), "fill", or "outline"
+# bar_highlight = "text"
 # workspace numbers; omit to follow bar_highlight
 # bar_tag_highlight = "text"
 
 # master window width ratio (0.0-1.0)
-# master_ratio = 0.55
+# master_ratio = 0.45
 
 # global modifier key: "option", "control", "command"
 # modifier = "option"
+# also fire the same binds with control+option+command, and +shift for move binds
+# hyper = true
 
 # extra space under the bar before windows
 # bar_gap = 0
 
 # focused window outline
 # border_width = 2
-# border_radius = 8
+# border_radius = 6
 
 # app name or bundle id for option+shift+return; omit to use the macOS default terminal
 # terminal = "Ghostty"
@@ -62,6 +64,11 @@
 # move_monitor_next = "shift+period"
 # last_workspace = "tab"
 # reload_config = "shift+c"
+# rename_workspace = "n"
+
+# names shown on the bar as 2-main
+# [workspace_names]
+# 2 = "main"
 
 # custom key bindings that run shell commands
 # [[custom]]

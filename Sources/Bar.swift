@@ -141,11 +141,14 @@ package final class Bar {
     private func tags(for monitor: Monitor?) -> [BarTag] {
         let count = Config.shared.workspaceCount
         guard let monitor else {
-            return (0..<count).map { BarTag(number: $0 + 1, active: $0 == 0, occupied: false) }
+            return (0..<count).map {
+                BarTag(number: $0 + 1, label: WorkspaceNamer.shared.label(for: $0), active: $0 == 0, occupied: false)
+            }
         }
         return (0..<count).map { index in
             BarTag(
                 number: index + 1,
+                label: WorkspaceNamer.shared.label(for: index),
                 active: index == monitor.active,
                 occupied: monitor.workspaces.indices.contains(index) && !monitor.workspaces[index].isEmpty
             )
@@ -189,6 +192,7 @@ package final class Bar {
 
 private struct BarTag: Equatable {
     let number: Int
+    let label: String
     let active: Bool
     let occupied: Bool
 }
@@ -261,7 +265,7 @@ private enum BarLaunch {
 private final class BarContentView: NSView {
     var displayID: CGDirectDisplayID = 0
     private var tags: [BarTag] = []
-    private var layout: Layout = .tile
+    private var layout: Layout = .initial
     private var windowCount = 0
     private var titleText = ""
     private var titleHighlighted = false
@@ -322,16 +326,18 @@ private final class BarContentView: NSView {
         var x: CGFloat = margin
         hits = []
 
+        let titleStyle = Config.shared.barHighlight
         let tagStyle = Config.shared.barTagHighlight
         let tagSide = contentHeight
         let markSide: CGFloat = 5
         for (index, tag) in tags.enumerated() {
-            let rect = NSRect(x: x, y: topPad, width: tagSide, height: tagSide)
+            let width = max(tagSide, ceil(textSize(tag.label, font: font).width) + 10)
+            let rect = NSRect(x: x, y: topPad, width: width, height: tagSide)
             if tag.active, titleHighlighted, tagStyle != .text {
                 paintAccent(rect.insetBy(dx: 0, dy: margin), style: tagStyle)
             }
             drawText(
-                "\(tag.number)",
+                tag.label,
                 in: rect,
                 font: font,
                 color: tagColor(tag, style: tagStyle, focused: titleHighlighted),
@@ -344,7 +350,7 @@ private final class BarContentView: NSView {
                 mark.fill()
             }
             hits.append((.tag(index), rect))
-            x += tagSide
+            x += width
         }
 
         let symbol = floating ? "><>" : (layout == .monocle ? "[M]" : "[]=")
@@ -354,8 +360,11 @@ private final class BarContentView: NSView {
         x = layoutRect.maxX
 
         if windowCount > 0 {
-            let countRect = NSRect(x: x, y: topPad, width: cellWidth("\(windowCount)", font: font), height: contentHeight)
-            drawText("\(windowCount)", in: countRect, font: font, color: .secondaryLabelColor, textY: textY, textHeight: textHeight)
+            let countRect = NSRect(
+                x: x, y: topPad, width: cellWidth("\(windowCount)", font: font), height: contentHeight)
+            drawText(
+                "\(windowCount)", in: countRect, font: font, color: .secondaryLabelColor, textY: textY,
+                textHeight: textHeight)
             x = countRect.maxX
         }
 
@@ -388,7 +397,6 @@ private final class BarContentView: NSView {
             width: max(0, titleSlot - titleMargin * 2),
             height: contentHeight
         )
-        let titleStyle = tagStyle == .text ? .text : Config.shared.barHighlight
         if titleHighlighted && !titleText.isEmpty, titleStyle != .text {
             paintAccent(titleRect.insetBy(dx: 0, dy: margin), style: titleStyle)
         }
@@ -460,7 +468,8 @@ private final class BarContentView: NSView {
 
     private func paintAccent(_ rect: NSRect, style: BarHighlight) {
         let width = Config.shared.borderWidth
-        let inner = style == .outline
+        let inner =
+            style == .outline
             ? rect.insetBy(dx: width / 2, dy: width / 2)
             : rect
         let radius = min(

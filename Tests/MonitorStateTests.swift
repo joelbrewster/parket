@@ -16,7 +16,7 @@ struct MonitorStateTests {
         state.resize(to: 4)
 
         #expect(state.workspaces == [[1], [2], [], []])
-        #expect(state.layouts == [.tile, .monocle, .tile, .tile])
+        #expect(state.layouts == [.tile, .monocle, .initial, .initial])
         #expect(state.focusedIndices == [0, 0, 0, 0])
         #expect(state.active == 1)
         #expect(state.previousActive == 0)

@@ -44,15 +44,17 @@ struct TomlTests {
         #expect(custom[1]["command"] as? String == "echo ok")
     }
 
-    @Test func rejectsMissingEquals() {
-        #expect(throws: Toml.Error.self) {
-            try Toml.parse("workspace_count 4")
-        }
-    }
-
-    @Test func rejectsUnterminatedString() {
-        #expect(throws: Toml.Error.self) {
-            try Toml.parse("modifier = \"option")
-        }
+    @Test func skipsBadLinesAndKeepsTheRest() throws {
+        let parsed = try Toml.parse(
+            """
+            workspace_count = 4
+            workspace_count 4
+            modifier = "option
+            bar_highlight = "text"
+            """
+        )
+        #expect(parsed["workspace_count"] as? Int == 4)
+        #expect(parsed["modifier"] as? String == nil)
+        #expect(parsed["bar_highlight"] as? String == "text")
     }
 }
