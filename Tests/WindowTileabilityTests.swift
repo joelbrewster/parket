@@ -42,11 +42,13 @@ struct WindowTileabilityTests {
         #expect(TileableWindowPolicy.rejectionReasons(attributes) == [.modal])
     }
 
-    @Test func smallSettingsSizedWindowsAutoFloat() {
+    @Test func smallPanelsAutoFloatButNormalWindowsDoNot() {
         let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let panel = CGRect(x: 100, y: 100, width: 420, height: 320)
         let settings = CGRect(x: 100, y: 100, width: 780, height: 640)
         let browser = CGRect(x: 0, y: 0, width: 1200, height: 900)
-        #expect(AutoFloatPolicy.shouldFloat(frame: settings, screen: screen))
+        #expect(AutoFloatPolicy.shouldFloat(frame: panel, screen: screen))
+        #expect(!AutoFloatPolicy.shouldFloat(frame: settings, screen: screen))
         #expect(!AutoFloatPolicy.shouldFloat(frame: browser, screen: screen))
     }
 

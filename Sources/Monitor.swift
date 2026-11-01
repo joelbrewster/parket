@@ -143,14 +143,13 @@ package final class Monitor {
             }
             return tiled.first
         }
-        let frames = Tiler.calculateFrames(
-            count: tiled.count,
-            screen: tileFrame,
-            layout: layouts[active],
-            masterRatio: Config.shared.masterRatio,
-            gap: Config.shared.windowGap
-        )
-        return zip(tiled, frames).first { $0.1.contains(point) }?.0
+        let plan = currentArrangePlan(tiled: tiled)
+        for (slot, tiledIndex) in plan.visibleTiledIndices.enumerated() {
+            if plan.tiledFrames[slot].contains(point) {
+                return tiled[tiledIndex]
+            }
+        }
+        return nil
     }
 
     @discardableResult
@@ -276,6 +275,7 @@ package final class Monitor {
         focusedIndices[active] = targetIndex
         let target = windows[targetIndex]
         focusAfterWindowRemoval(target)
+        restack(raiseAboveFloaters: layouts[active] == .monocle && !isFloating(target))
         return target
     }
 
@@ -285,11 +285,13 @@ package final class Monitor {
 
     func placedFrame(for window: TrackedWindow) -> CGRect? {
         if isFloating(window) { return nil }
-        let tiled = workspaces[active].filter { !isFloating($0) }
-        guard let index = tiled.firstIndex(of: window) else { return nil }
-        let frames = placedWindowFrames(windowCount: tiled.count)
-        guard frames.indices.contains(index) else { return nil }
-        return frames[index]
+        let tiled = nextTiled()
+        guard let tiledIndex = tiled.firstIndex(of: window) else { return nil }
+        let plan = currentArrangePlan(tiled: tiled)
+        guard let visibleSlot = plan.visibleTiledIndices.firstIndex(of: tiledIndex),
+            plan.tiledFrames.indices.contains(visibleSlot)
+        else { return nil }
+        return plan.tiledFrames[visibleSlot]
     }
 
     func focusNext() { focusOffset(1) }
@@ -297,27 +299,45 @@ package final class Monitor {
 
     private func focusOffset(_ offset: Int) {
         let windows = workspaces[active]
-        guard windows.count > 1,
-            let focused = WindowManager.focusedWindow(),
-            let i = windows.firstIndex(of: focused)
+        let focusedIndex = WindowManager.focusedWindow().flatMap { windows.firstIndex(of: $0) }
+        guard
+            let currentIndex = WorkspaceFocusCycle.resolveCurrentIndex(
+                focusedIndex: focusedIndex,
+                savedIndex: focusedIndices[active],
+                count: windows.count
+            ),
+            let targetIndex = WorkspaceFocusCycle.targetIndex(
+                current: currentIndex,
+                offset: offset,
+                count: windows.count
+            )
         else { return }
-        let targetIndex = (i + offset + windows.count) % windows.count
         let target = windows[targetIndex]
-        target.focus()
+        let tiledBefore = nextTiled()
+        let visibleBefore = currentArrangePlan(tiled: tiledBefore).visibleTiledIndices
         focusedIndices[active] = targetIndex
+        let tiledAfter = nextTiled()
+        let visibleAfter = currentArrangePlan(tiled: tiledAfter).visibleTiledIndices
+        if layouts[active] == .tile, visibleBefore != visibleAfter {
+            retile(validate: false)
+        } else {
+            restack()
+        }
+        target.focus()
     }
 
     func swapMaster() {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
-        let tiled = workspaces[active].filter { !isFloating($0) }
+        let tiled = nextTiled()
         guard tiled.count > 1 else { return }
-        guard let focused = WindowManager.focusedWindow(),
-            !isFloating(focused),
+        let focused = selectedWindow()
+        guard let focused, !isFloating(focused),
             let focusIndex = workspaces[active].firstIndex(of: focused),
             let masterIndex = workspaces[active].firstIndex(of: tiled[0]),
             focusIndex != masterIndex
         else { return }
         workspaces[active].swapAt(masterIndex, focusIndex)
+        focusedIndices[active] = masterIndex
         retile(validate: false)
         workspaces[active][masterIndex].focus()
     }
@@ -326,14 +346,13 @@ package final class Monitor {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
         layouts[active] = layouts[active] == .tile ? .monocle : .tile
         persistLayouts()
-        retile(validate: false)
-        if layouts[active] == .monocle {
-            let tiled = workspaces[active].filter { !isFloating($0) }
-            if let focused = WindowManager.focusedWindow(), tiled.contains(focused) {
-                focused.raise()
-            } else if let first = tiled.first {
-                first.raise()
-            }
+        retile(force: true, validate: false)
+        let expectedLayout = layouts[active]
+        let generation = geometryOperationGeneration
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [self] in
+            guard geometryOperationGeneration == generation else { return }
+            guard layouts[active] == expectedLayout else { return }
+            retile(force: true, validate: false)
         }
     }
 
@@ -365,16 +384,13 @@ package final class Monitor {
 
     func toggleFloating() {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
-        guard let focused = WindowManager.focusedWindow(),
-            let index = workspaces[active].firstIndex(of: focused)
+        guard let window = selectedWindow(),
+            let index = workspaces[active].firstIndex(of: window)
         else { return }
-        let window = workspaces[active][index]
-        let next = !isFloating(window)
-        setFloating(window, next)
-        if next {
-            window.raise()
-        }
+        focusedIndices[active] = index
+        setFloating(window, !isFloating(window))
         retile(validate: false)
+        window.focus()
     }
 
     private func scheduleRetile() {
@@ -412,37 +428,71 @@ package final class Monitor {
     func retile(force: Bool = false, validate: Bool = true) -> CGRect {
         guard force || !WorkspaceManager.shared.isTilingPaused else { return tileFrame }
         return PerformanceTelemetry.measure(.retile) {
-            deduplicateActiveWorkspace()
-            if validate {
-                cleanActiveWorkspace()
-            }
-            if force || validate {
-                invalidateActiveWorkspaceAppliedGeometry()
-            }
-            suppressGeometryNotifications()
-            pruneFloating()
-            let tiled = workspaces[active].filter { !isFloating($0) }
-            let frames = placedWindowFrames(windowCount: tiled.count)
-            for i in tiled.indices {
-                tiled[i].setFrame(frames[i])
-            }
-            for window in workspaces[active] where isFloating(window) {
-                if let frame = floatingFrames[window.group] {
-                    window.setFrame(frame)
-                }
-            }
-            for i in tiled.indices {
-                scheduleWindowSettle(
-                    window: tiled[i],
-                    target: frames[i],
-                    step: 0,
-                    generation: geometryOperationGeneration,
-                    previousAttempt: nil
-                )
-            }
-            FocusBorder.shared.concealUntilSettled()
-            return tileFrame
+            arrange(validate: validate, force: force)
         }
+    }
+
+    private func arrange(validate: Bool, force: Bool) -> CGRect {
+        deduplicateActiveWorkspace()
+        if validate {
+            cleanActiveWorkspace()
+        }
+        if force || validate {
+            invalidateActiveWorkspaceAppliedGeometry()
+        }
+        suppressGeometryNotifications()
+        extendGeometrySuppression(
+            by: Double(Self.windowSettleMaxSteps) * Self.windowSettleStepDelay
+                + Self.geometrySuppressionDelay
+        )
+        pruneFloating()
+        let tiled = nextTiled()
+        let plan = currentArrangePlan(tiled: tiled)
+        for index in tiled.indices {
+            WindowManager.invalidateAppliedGeometry(tiled[index])
+            if let slot = plan.visibleTiledIndices.firstIndex(of: index) {
+                tiled[index].setFrame(plan.tiledFrames[slot])
+            } else {
+                hideOffscreen(tiled[index])
+            }
+        }
+        for window in workspaces[active] where isFloating(window) {
+            if let frame = floatingFrames[window.group] {
+                window.setFrame(frame)
+            }
+        }
+        for (slot, tiledIndex) in plan.visibleTiledIndices.enumerated() {
+            scheduleWindowSettle(
+                window: tiled[tiledIndex],
+                target: plan.tiledFrames[slot],
+                step: 0,
+                generation: geometryOperationGeneration,
+                previousAttempt: nil
+            )
+        }
+        restack(raiseAboveFloaters: plan.raiseSelectedAboveFloaters)
+        FocusBorder.shared.concealUntilSettled()
+        return tileFrame
+    }
+
+    private func currentArrangePlan(tiled: [TrackedWindow]) -> ArrangePlan {
+        let selected = selectedWindow()
+        let focusedTiledIndex = selected.flatMap { tiled.firstIndex(of: $0) }
+        return ArrangePlanner.plan(
+            tileFrame: tileFrame,
+            layout: layouts[active],
+            tiledCount: tiled.count,
+            focusedTiledIndex: focusedTiledIndex,
+            selectedIsTiled: selected.map { !isFloating($0) } ?? false,
+            floatingCount: workspaces[active].filter { isFloating($0) }.count,
+            masterRatio: Config.shared.masterRatio,
+            gap: Config.shared.windowGap
+        )
+    }
+
+    func restack(raiseAboveFloaters: Bool = false) {
+        _ = raiseAboveFloaters
+        selectedWindow()?.raise()
     }
 
     func cancelPendingRetile() {
@@ -535,6 +585,9 @@ package final class Monitor {
                 applied = window.setSize(target.size, force: true)
             }
             guard applied else { return }
+            if layouts[active] == .monocle {
+                selectedWindow()?.raise()
+            }
             scheduleWindowSettle(
                 window: window,
                 target: target,
@@ -560,9 +613,11 @@ package final class Monitor {
         guard workspaces.indices.contains(active) else { return nil }
         let tiled = workspaces[active].filter { !isFloating($0) }
         guard let index = tiled.firstIndex(of: window) else { return nil }
-        let frames = placedWindowFrames(windowCount: tiled.count)
-        guard frames.indices.contains(index) else { return nil }
-        guard framesMatch(frames[index], target, tolerance: Self.frameTolerance) else { return nil }
+        let plan = currentArrangePlan(tiled: tiled)
+        guard let slot = plan.visibleTiledIndices.firstIndex(of: index),
+            plan.tiledFrames.indices.contains(slot)
+        else { return nil }
+        guard framesMatch(plan.tiledFrames[slot], target, tolerance: Self.frameTolerance) else { return nil }
         guard let frame = window.getFrame() else { return nil }
         guard
             let operation = WindowFrameSettlePlan.operation(
@@ -582,16 +637,30 @@ package final class Monitor {
     }
 
     private func activeWorkspaceMatchesLayout(tolerance: CGFloat) -> Bool {
-        let tiled = workspaces[active].filter { !isFloating($0) }
-        let frames = placedWindowFrames(windowCount: tiled.count)
-        guard frames.count == tiled.count else { return false }
-
-        for i in tiled.indices {
-            guard tiled[i].isTileable(), let frame = tiled[i].getFrame() else { return false }
-            guard framesMatch(frame, frames[i], tolerance: tolerance) else { return false }
+        let tiled = nextTiled()
+        let plan = currentArrangePlan(tiled: tiled)
+        guard plan.tiledFrames.count == plan.visibleTiledIndices.count else { return false }
+        let visible = Set(plan.visibleTiledIndices)
+        for index in tiled.indices {
+            guard tiled[index].isTileable(), let frame = tiled[index].getFrame() else { return false }
+            if let slot = plan.visibleTiledIndices.firstIndex(of: index) {
+                guard framesMatch(frame, plan.tiledFrames[slot], tolerance: tolerance) else { return false }
+            } else if visible.contains(index) {
+                return false
+            }
         }
-
         return true
+    }
+
+    private func nextTiled() -> [TrackedWindow] {
+        workspaces[active].filter { !isFloating($0) }
+    }
+
+    private func selectedWindow() -> TrackedWindow? {
+        if workspaces[active].indices.contains(focusedIndices[active]) {
+            return workspaces[active][focusedIndices[active]]
+        }
+        return WindowManager.focusedWindow()
     }
 
     private func pruneFloating() {

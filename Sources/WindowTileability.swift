@@ -8,8 +8,8 @@ package enum AutoFloatPolicy {
         let widthRatio = frame.width / screen.width
         let heightRatio = frame.height / screen.height
         let areaRatio = widthRatio * heightRatio
-        if areaRatio <= 0.35 { return true }
-        if widthRatio <= 0.55 && heightRatio <= 0.7 { return true }
+        if areaRatio <= 0.18 { return true }
+        if widthRatio <= 0.4 && heightRatio <= 0.45 { return true }
         return false
     }
 

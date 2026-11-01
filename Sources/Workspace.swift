@@ -429,6 +429,10 @@ package final class WorkspaceManager {
                 monitor.focusedIndices[monitor.active] = location.windowIndex
             }
             monitor.rememberFocusedWindow(window)
+            monitor.restack(
+                raiseAboveFloaters: monitor.layouts[monitor.active] == .monocle
+                    && !monitor.isFloating(window)
+            )
             windowRegistry.recordFocus(window, at: location)
             WindowManager.recordExpectedFocus(window)
             StatusBar.shared.update()

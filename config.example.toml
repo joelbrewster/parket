@@ -79,7 +79,7 @@
 # command = "open -n -a Safari"
 
 # optional workspace/float hints (session memory usually replaces these)
-# small windows and Picture in Picture float automatically
+# tiny panels and Picture in Picture float automatically
 # [[rules]]
 # app = "Safari"
 # workspace = 2

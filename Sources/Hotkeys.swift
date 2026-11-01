@@ -15,6 +15,7 @@ package final class Hotkeys {
     private static var bindings: [HotkeyChord: HotkeyAction] = [:]
     private static var modifier: HotkeyModifier = .option
     private static var hyper = true
+    private static var eventTap: CFMachPort?
 
     private var tap: CFMachPort?
     private var tapSource: CFRunLoopSource?
@@ -128,12 +129,18 @@ package final class Hotkeys {
         }
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
+        Self.lock.lock()
+        Self.eventTap = tap
+        Self.lock.unlock()
         self.tap = tap
         tapSource = source
         return true
     }
 
     private func teardownTap() {
+        Self.lock.lock()
+        Self.eventTap = nil
+        Self.lock.unlock()
         if let source = tapSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes)
         }
@@ -185,10 +192,11 @@ package final class Hotkeys {
 
     private static let tapCallback: CGEventTapCallBack = { _, type, event, _ in
         if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-            DispatchQueue.main.async {
-                MainActor.assumeIsolated {
-                    Hotkeys.shared.reenableTap()
-                }
+            lock.lock()
+            let tap = eventTap
+            lock.unlock()
+            if let tap {
+                CGEvent.tapEnable(tap: tap, enable: true)
             }
             return Unmanaged.passUnretained(event)
         }
