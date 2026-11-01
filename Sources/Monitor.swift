@@ -141,7 +141,8 @@ package final class Monitor {
             count: tiled.count,
             screen: tileFrame,
             layout: layouts[active],
-            masterRatio: Config.shared.masterRatio
+            masterRatio: Config.shared.masterRatio,
+            gap: Config.shared.windowGap
         )
         return zip(tiled, frames).first { $0.1.contains(point) }?.0
     }
@@ -575,13 +576,12 @@ package final class Monitor {
     }
 
     private func placedWindowFrames(windowCount: Int) -> [CGRect] {
-        FocusBorderLayout.windowFrames(
-            from: Tiler.calculateFrames(
-                count: windowCount,
-                screen: tileFrame,
-                layout: layouts[active],
-                masterRatio: Config.shared.masterRatio
-            )
+        Tiler.calculateFrames(
+            count: windowCount,
+            screen: tileFrame,
+            layout: layouts[active],
+            masterRatio: Config.shared.masterRatio,
+            gap: Config.shared.windowGap
         )
     }
 

@@ -216,7 +216,8 @@ package struct Config {
     package var barFont: BarFont = .mono
     package var barHighlight: BarHighlight = .text
     package var barTagHighlight: BarHighlight = .text
-    package var barGap: CGFloat = 0
+    package var outerGap: CGFloat = 0
+    package var windowGap: CGFloat = 8
     package var borderWidth: CGFloat = 2
     package var borderRadius: CGFloat = 6
     package var terminal = "Ghostty"
@@ -329,8 +330,14 @@ package struct Config {
             config.focusFollowsMouse = followsMouse
         }
 
-        if let gap = cgFloat(toml["bar_gap"]), gap >= 0, gap <= 64 {
-            config.barGap = gap
+        if let gap = cgFloat(toml["outer_gap"]) ?? cgFloat(toml["bar_gap"]) ?? cgFloat(toml["outside_gap"]),
+            gap >= 0, gap <= 64
+        {
+            config.outerGap = gap
+        }
+
+        if let gap = cgFloat(toml["window_gap"]) ?? cgFloat(toml["inner_gap"]), gap >= 0, gap <= 64 {
+            config.windowGap = gap
         }
 
         if let width = cgFloat(toml["border_width"]), width > 0, width <= 32 {
@@ -510,10 +517,18 @@ package struct Config {
     }
 
     @MainActor
-    package static func setBarGap(_ value: CGFloat) {
-        shared.barGap = min(max(value, 0), 64)
-        defaults.set(Double(shared.barGap), forKey: uiBarGapKey)
+    package static func setOuterGap(_ value: CGFloat) {
+        shared.outerGap = min(max(value, 0), 64)
+        defaults.set(Double(shared.outerGap), forKey: uiOuterGapKey)
         WorkspaceManager.shared.applyCurrentConfig()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setWindowGap(_ value: CGFloat) {
+        shared.windowGap = min(max(value, 0), 64)
+        defaults.set(Double(shared.windowGap), forKey: uiWindowGapKey)
+        WorkspaceManager.shared.retileNow()
         StatusBar.shared.refresh()
     }
 
@@ -630,7 +645,10 @@ package struct Config {
         if let raw = defaults.string(forKey: uiTagHighlightKey), let value = parseHighlight(raw) {
             shared.barTagHighlight = value
         }
-        if let value = number(uiBarGapKey), value >= 0, value <= 64 { shared.barGap = value }
+        if let value = number(uiOuterGapKey) ?? number(uiBarGapKey), value >= 0, value <= 64 {
+            shared.outerGap = value
+        }
+        if let value = number(uiWindowGapKey), value >= 0, value <= 64 { shared.windowGap = value }
         if let value = number(uiBorderWidthKey), value > 0, value <= 32 { shared.borderWidth = value }
         if let value = number(uiBorderRadiusKey), value >= 0, value <= 64 { shared.borderRadius = value }
         if let count = int(uiWorkspaceCountKey), WorkspaceBounds.isValidCount(count) {
@@ -678,7 +696,9 @@ package struct Config {
     private static let uiFontKey = "parket.barFont"
     private static let uiHighlightKey = "parket.barHighlight"
     private static let uiTagHighlightKey = "parket.barTagHighlight"
+    private static let uiOuterGapKey = "parket.outerGap"
     private static let uiBarGapKey = "parket.barGap"
+    private static let uiWindowGapKey = "parket.windowGap"
     private static let uiBorderWidthKey = "parket.borderWidth"
     private static let uiBorderRadiusKey = "parket.borderRadius"
     private static let uiWorkspaceCountKey = "parket.workspaceCount"
@@ -883,7 +903,8 @@ package struct Config {
         bar_font = "mono"
         bar_highlight = "text"
         bar_tag_highlight = "text"
-        bar_gap = 0
+        outer_gap = 0
+        window_gap = 8
         border_width = 2
         border_radius = 6
         terminal = "Ghostty"

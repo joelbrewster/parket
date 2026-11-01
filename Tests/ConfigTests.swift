@@ -120,6 +120,14 @@ struct ConfigTests {
         #expect(config.borderRadius == 8)
     }
 
+    @Test func windowGapDefaultsAndParses() throws {
+        #expect(Config().windowGap == 8)
+        let config = try #require(Config.parse("window_gap = 12"))
+        #expect(config.windowGap == 12)
+        let alias = try #require(Config.parse("inner_gap = 4"))
+        #expect(alias.windowGap == 4)
+    }
+
     @Test func workspaceNamesParseByNumber() throws {
         #expect(Config().workspaceNames.isEmpty)
         let config = try #require(

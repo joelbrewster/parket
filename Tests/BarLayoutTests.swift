@@ -26,6 +26,18 @@ struct BarLayoutTests {
         #expect(tiled.height == visible.maxY - BarLayout.overlayHeight(menuBar: 25) - BarLayout.gap)
     }
 
+    @Test func tileFrameAppliesOutsideSpaceOnLeftRightAndBottom() {
+        let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let visible = CGRect(x: 0, y: 0, width: 1440, height: 900)
+        let outer: CGFloat = 12
+        let tiled = BarLayout.tileFrame(screenFrame: screen, visibleFrame: visible, outer: outer)
+
+        #expect(tiled.minX == outer)
+        #expect(tiled.maxX == visible.maxX - outer)
+        #expect(tiled.minY == BarLayout.reservedTop + outer)
+        #expect(tiled.maxY == visible.maxY - outer)
+    }
+
     @Test func tileFrameFollowsTallerMenuBar() {
         let screen = CGRect(x: 0, y: 0, width: 1440, height: 900)
         let visible = CGRect(x: 0, y: 37, width: 1440, height: 811)

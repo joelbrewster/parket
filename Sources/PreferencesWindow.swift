@@ -25,7 +25,8 @@ package final class PreferencesWindowController: NSWindowController {
     private let fontPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let highlightPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let tagHighlightPopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    private let barGapPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let outerGapPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let windowGapPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let borderWidthPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let borderRadiusPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let workspaceCountPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -87,7 +88,8 @@ package final class PreferencesWindowController: NSWindowController {
         select(fontPopup, string: config.barFont.rawValue)
         select(highlightPopup, string: config.barHighlight.rawValue)
         select(tagHighlightPopup, string: config.barTagHighlight.rawValue)
-        select(barGapPopup, number: config.barGap)
+        select(outerGapPopup, number: config.outerGap)
+        select(windowGapPopup, number: config.windowGap)
         select(borderWidthPopup, number: config.borderWidth)
         select(borderRadiusPopup, number: config.borderRadius)
         select(workspaceCountPopup, integer: config.workspaceCount)
@@ -112,7 +114,8 @@ package final class PreferencesWindowController: NSWindowController {
             ], action: #selector(chooseFont(_:)))
         fillHighlight(highlightPopup, action: #selector(chooseHighlight(_:)))
         fillHighlight(tagHighlightPopup, action: #selector(chooseTagHighlight(_:)))
-        fillNumbers(barGapPopup, [0, 1, 2, 4, 8], suffix: " px", action: #selector(chooseBarGap(_:)))
+        fillNumbers(outerGapPopup, [0, 2, 4, 8, 12, 16, 24], suffix: " px", action: #selector(chooseOuterGap(_:)))
+        fillNumbers(windowGapPopup, [0, 2, 4, 8, 12, 16, 24], suffix: " px", action: #selector(chooseWindowGap(_:)))
         fillNumbers(borderWidthPopup, [1, 2, 3, 4], suffix: " px", action: #selector(chooseBorderWidth(_:)))
         fillNumbers(
             borderRadiusPopup, [0, 2, 4, 6, 8, 10, 12], suffix: " px", action: #selector(chooseBorderRadius(_:)))
@@ -143,13 +146,14 @@ package final class PreferencesWindowController: NSWindowController {
             row("Bar Font", fontPopup),
             row("Window Highlight", highlightPopup),
             row("Tag Highlight", tagHighlightPopup),
-            row("Bar Gap", barGapPopup),
             row("Border Width", borderWidthPopup),
             row("Border Radius", borderRadiusPopup),
         ])
         let tiling = grid([
             row("Workspaces", workspaceCountPopup),
             row("Master Width", masterRatioPopup),
+            row("Outside Space", outerGapPopup),
+            row("Window Gap", windowGapPopup),
             row("Focus Follows Mouse", focusFollowsMouseCheckbox),
         ])
         let keys = grid([
@@ -413,9 +417,14 @@ package final class PreferencesWindowController: NSWindowController {
         Config.setBarTagHighlight(value)
     }
 
-    @objc private func chooseBarGap(_ sender: NSPopUpButton) {
+    @objc private func chooseOuterGap(_ sender: NSPopUpButton) {
         guard !syncing, let value = number(from: sender) else { return }
-        Config.setBarGap(value)
+        Config.setOuterGap(value)
+    }
+
+    @objc private func chooseWindowGap(_ sender: NSPopUpButton) {
+        guard !syncing, let value = number(from: sender) else { return }
+        Config.setWindowGap(value)
     }
 
     @objc private func chooseBorderWidth(_ sender: NSPopUpButton) {

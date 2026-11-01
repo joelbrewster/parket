@@ -33,8 +33,11 @@
 # also fire the same binds with control+option+command, and +shift for move binds
 # hyper = true
 
-# extra space under the bar before windows
-# bar_gap = 0
+# padding around the tiled area (under the bar, left, right, bottom)
+# outer_gap = 0
+
+# space between tiled windows (monocle stays full-bleed)
+# window_gap = 8
 
 # focused window outline
 # border_width = 2

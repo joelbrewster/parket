@@ -25,14 +25,18 @@ package enum BarLayout {
     package static func tileFrame(
         screenFrame: CGRect,
         visibleFrame: CGRect,
-        gap: CGFloat = BarLayout.gap
+        outer: CGFloat = BarLayout.gap
     ) -> CGRect {
-        let top = screenFrame.minY + overlayHeight(menuBar: visibleFrame.minY - screenFrame.minY) + gap
+        let pad = max(0, outer)
+        let top = screenFrame.minY + overlayHeight(menuBar: visibleFrame.minY - screenFrame.minY) + pad
+        let bottom = visibleFrame.maxY - pad
+        let left = visibleFrame.minX + pad
+        let right = visibleFrame.maxX - pad
         return CGRect(
-            x: visibleFrame.minX,
+            x: left,
             y: top,
-            width: visibleFrame.width,
-            height: max(0, visibleFrame.maxY - top)
+            width: max(0, right - left),
+            height: max(0, bottom - top)
         )
     }
 }

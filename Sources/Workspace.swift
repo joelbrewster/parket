@@ -565,14 +565,7 @@ package final class WorkspaceManager {
         for monitor in monitors {
             monitor.resizeWorkspaces(to: count)
             if let geometry = snapshot.screen(displayID: monitor.displayID) {
-                monitor.tileFrame =
-                    Config.shared.bar
-                    ? BarLayout.tileFrame(
-                        screenFrame: geometry.frame,
-                        visibleFrame: geometry.visibleFrame,
-                        gap: Config.shared.barGap
-                    )
-                    : geometry.visibleFrame
+                monitor.tileFrame = Self.tileFrame(for: geometry)
             }
             if !isTilingPaused {
                 monitor.retile(validate: true)
@@ -619,6 +612,24 @@ package final class WorkspaceManager {
         }
     }
 
+    private static func tileFrame(for geometry: ConvertedScreenDescriptor) -> CGRect {
+        let outer = Config.shared.outerGap
+        if Config.shared.bar {
+            return BarLayout.tileFrame(
+                screenFrame: geometry.frame,
+                visibleFrame: geometry.visibleFrame,
+                outer: outer
+            )
+        }
+        let pad = max(0, outer)
+        return CGRect(
+            x: geometry.visibleFrame.minX + pad,
+            y: geometry.visibleFrame.minY + pad,
+            width: max(0, geometry.visibleFrame.width - pad * 2),
+            height: max(0, geometry.visibleFrame.height - pad * 2)
+        )
+    }
+
     private func rebuildMonitors() {
         let screens = NSScreen.screens
         rebuildMonitors(screens: screens, snapshot: WindowManager.screenSnapshot(for: screens))
@@ -634,13 +645,7 @@ package final class WorkspaceManager {
                 return Monitor(
                     displayID: displayID,
                     screen: screen,
-                    tileFrame: Config.shared.bar
-                        ? BarLayout.tileFrame(
-                            screenFrame: geometry.frame,
-                            visibleFrame: geometry.visibleFrame,
-                            gap: Config.shared.barGap
-                        )
-                        : geometry.visibleFrame,
+                    tileFrame: Self.tileFrame(for: geometry),
                     offscreenContext: OffscreenWindowPlacementContext(
                         screen: geometry.visibleFrame,
                         visibleScreens: visibleScreens

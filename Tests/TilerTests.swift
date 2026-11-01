@@ -57,6 +57,17 @@ struct TilerTests {
         }
     }
 
+    @Test func windowGapSeparatesMasterAndStack() {
+        let gap: CGFloat = 8
+        let frames = Tiler.calculateFrames(
+            count: 3, screen: screen, layout: .tile, masterRatio: 0.5, gap: gap)
+        #expect(frames.count == 3)
+        #expect(frames[1].minX == frames[0].maxX + gap)
+        #expect(frames[2].minY == frames[1].maxY + gap)
+        #expect(frames[0].maxX + gap + frames[1].width == screen.width)
+        #expect(frames[1].height + gap + frames[2].height == screen.height)
+    }
+
     @Test func tileOutputCoversScreenArea() {
         for count in 1...20 {
             let frames = Tiler.calculateFrames(count: count, screen: screen, layout: .tile)
