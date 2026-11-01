@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 
 @testable import ParketCore
@@ -107,5 +108,19 @@ struct TilerTests {
         let frames = Tiler.calculateFrames(count: 5, screen: screen, layout: .monocle)
         #expect(frames.count == 5)
         #expect(frames.allSatisfy { $0 == screen })
+    }
+
+    @Test func workspaceLayoutStoreRoundTripsPerDisplay() {
+        let displayID: CGDirectDisplayID = 42_424_242
+        let key = "parket.layouts.\(displayID)"
+        UserDefaults.standard.removeObject(forKey: key)
+        defer { UserDefaults.standard.removeObject(forKey: key) }
+
+        let missing = WorkspaceLayoutStore.load(displayID: displayID, count: 3)
+        #expect(missing == [.monocle, .monocle, .monocle])
+
+        WorkspaceLayoutStore.save(displayID: displayID, layouts: [.tile, .monocle, .tile])
+        let loaded = WorkspaceLayoutStore.load(displayID: displayID, count: 4)
+        #expect(loaded == [.tile, .monocle, .tile, .monocle])
     }
 }

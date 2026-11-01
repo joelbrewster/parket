@@ -3,6 +3,11 @@ import AppKit
 package enum FocusBorderLayout {
     package static let width: CGFloat = 4
 
+    @MainActor
+    package static func pad(borderWidth: CGFloat = Config.shared.borderWidth) -> CGFloat {
+        max(width, ceil(borderWidth / 2) + 1)
+    }
+
     package static func windowFrame(from tile: CGRect) -> CGRect {
         tile.insetBy(dx: width, dy: width)
     }
@@ -18,15 +23,19 @@ package final class FocusBorder {
 
     private static let settleTolerance: CGFloat = 10
     private static let idleDelay: TimeInterval = 0.12
-    private static let fadeInDuration: TimeInterval = 0.1
-    private static let fadeOutDuration: TimeInterval = 0.06
+    private static let focusRetryDelay: TimeInterval = 0.04
+    private static let fadeInDuration: TimeInterval = 0.08
+    private static let fadeOutDuration: TimeInterval = 0.05
     private static let maxSettleAttempts = 20
+    private static let maxFocusRetries = 8
 
     private var panel: FocusBorderPanel?
     private let revealDebounce = Debounce()
     private var generation: UInt64 = 0
     private var settleAttempts = 0
+    private var focusRetries = 0
     private var dragging = false
+    private var waitingForTile = false
     private var globalMonitor: Any?
     private var localMonitor: Any?
 
@@ -46,7 +55,7 @@ package final class FocusBorder {
             FocusBorder.shared.handleMouse(event)
             return event
         }
-        reveal()
+        reveal(waitForTile: false)
     }
 
     package func stop() {
@@ -65,7 +74,7 @@ package final class FocusBorder {
             hide(animated: true)
             return
         }
-        reveal()
+        reveal(waitForTile: false)
     }
 
     package func concealUntilSettled() {
@@ -74,7 +83,7 @@ package final class FocusBorder {
             return
         }
         hide(animated: true)
-        scheduleReveal()
+        scheduleReveal(waitForTile: true)
     }
 
     package func applyAppearance() {
@@ -103,18 +112,22 @@ package final class FocusBorder {
 
     private func endDrag() {
         dragging = false
-        scheduleReveal()
+        scheduleReveal(waitForTile: true)
     }
 
-    private func reveal() {
+    private func reveal(waitForTile: Bool) {
         cancelReveal()
         settleAttempts = 0
+        focusRetries = 0
+        waitingForTile = waitForTile
         tryShow()
     }
 
-    private func scheduleReveal() {
+    private func scheduleReveal(waitForTile: Bool) {
         cancelReveal()
         settleAttempts = 0
+        focusRetries = 0
+        waitingForTile = waitForTile
         revealDebounce.schedule(after: Self.idleDelay) { [self] in
             tryShow()
         }
@@ -131,10 +144,18 @@ package final class FocusBorder {
             return
         }
         guard let actual = actualWindowFrame() else {
+            focusRetries += 1
+            if focusRetries <= Self.maxFocusRetries {
+                revealDebounce.schedule(after: Self.focusRetryDelay) { [self] in
+                    tryShow()
+                }
+                return
+            }
             hide(animated: true)
             return
         }
-        if let tile = tileTargetFrame(), !near(actual, tile) {
+        focusRetries = 0
+        if waitingForTile, let tile = tileTargetFrame(), !near(actual, tile) {
             settleAttempts += 1
             if settleAttempts <= Self.maxSettleAttempts {
                 hide(animated: true)
@@ -144,11 +165,13 @@ package final class FocusBorder {
                 return
             }
         }
+        let frame = tileTargetFrame().flatMap { tile in near(actual, tile) ? tile : nil } ?? actual
         let screens = WindowManager.screenDescriptors()
+        let pad = FocusBorderLayout.pad()
         show(
-            ScreenGeometry.convertRect(actual, screens: screens).insetBy(
-                dx: -FocusBorderLayout.width,
-                dy: -FocusBorderLayout.width
+            ScreenGeometry.convertRect(frame, screens: screens).insetBy(
+                dx: -pad,
+                dy: -pad
             ))
     }
 
@@ -281,7 +304,7 @@ private final class FocusBorderView: NSView {
     override var isOpaque: Bool { false }
 
     override func draw(_ dirtyRect: NSRect) {
-        let inset = FocusBorderLayout.width
+        let inset = FocusBorderLayout.pad()
         let inner = bounds.insetBy(dx: inset, dy: inset)
         let radius = min(
             Config.shared.borderRadius,
@@ -291,6 +314,7 @@ private final class FocusBorderView: NSView {
         MenuBarChrome.accent.setStroke()
         let path = NSBezierPath(roundedRect: inner, xRadius: radius, yRadius: radius)
         path.lineWidth = Config.shared.borderWidth
+        path.lineJoinStyle = .round
         path.stroke()
     }
 }

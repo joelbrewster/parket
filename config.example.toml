@@ -78,17 +78,12 @@
 # key = "shift+space"
 # command = "open -n -a Safari"
 
-# new windows matching app name or bundle id
-# workspace is 1-10; float keeps the window out of the tile layout
-# [[rules]]
-# app = "Finder"
-# float = true
-#
+# workspace placement by app name or bundle id (1-10)
+# small windows and Picture in Picture float automatically
 # [[rules]]
 # app = "Safari"
 # workspace = 2
 #
 # [[rules]]
-# app = "com.apple.calculator"
+# app = "Finder"
 # float = true
-# workspace = 9

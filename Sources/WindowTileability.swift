@@ -1,4 +1,26 @@
 import ApplicationServices
+import CoreGraphics
+
+package enum AutoFloatPolicy {
+    package static func shouldFloat(frame: CGRect, screen: CGRect, title: String? = nil) -> Bool {
+        if isPictureInPicture(title: title) { return true }
+        guard screen.width > 1, screen.height > 1 else { return false }
+        let widthRatio = frame.width / screen.width
+        let heightRatio = frame.height / screen.height
+        let areaRatio = widthRatio * heightRatio
+        if areaRatio <= 0.35 { return true }
+        if widthRatio <= 0.55 && heightRatio <= 0.7 { return true }
+        return false
+    }
+
+    package static func isPictureInPicture(title: String?) -> Bool {
+        guard let raw = title?.lowercased() else { return false }
+        let compact = raw.filter { !$0.isWhitespace }
+        return compact.contains("picture-in-picture")
+            || compact.contains("pictureinpicture")
+            || compact == "pip"
+    }
+}
 
 package struct TileableWindowAttributes: Equatable {
     var role: String?

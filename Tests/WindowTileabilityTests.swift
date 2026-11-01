@@ -1,4 +1,5 @@
 import ApplicationServices
+import CoreGraphics
 import Testing
 
 @testable import ParketCore
@@ -39,6 +40,22 @@ struct WindowTileabilityTests {
 
         #expect(!TileableWindowPolicy.accepts(attributes))
         #expect(TileableWindowPolicy.rejectionReasons(attributes) == [.modal])
+    }
+
+    @Test func smallSettingsSizedWindowsAutoFloat() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let settings = CGRect(x: 100, y: 100, width: 780, height: 640)
+        let browser = CGRect(x: 0, y: 0, width: 1200, height: 900)
+        #expect(AutoFloatPolicy.shouldFloat(frame: settings, screen: screen))
+        #expect(!AutoFloatPolicy.shouldFloat(frame: browser, screen: screen))
+    }
+
+    @Test func pictureInPictureTitlesAutoFloat() {
+        let screen = CGRect(x: 0, y: 0, width: 1512, height: 982)
+        let frame = CGRect(x: 40, y: 40, width: 1200, height: 800)
+        #expect(AutoFloatPolicy.shouldFloat(frame: frame, screen: screen, title: "Picture in Picture"))
+        #expect(AutoFloatPolicy.isPictureInPicture(title: "Picture-in-Picture"))
+        #expect(!AutoFloatPolicy.isPictureInPicture(title: "Safari"))
     }
 
     private func documentWindow() -> TileableWindowAttributes {

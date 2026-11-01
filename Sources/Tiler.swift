@@ -1,10 +1,36 @@
+import CoreGraphics
 import Foundation
 
-package enum Layout {
+package enum Layout: String, Equatable {
     case tile
     case monocle
 
     static let initial = Layout.monocle
+}
+
+package enum WorkspaceLayoutStore {
+    private static let keyPrefix = "parket.layouts."
+
+    package static func load(displayID: CGDirectDisplayID, count: Int) -> [Layout] {
+        let clamped = WorkspaceBounds.clampedCount(count)
+        guard let raw = UserDefaults.standard.array(forKey: key(displayID)) as? [String] else {
+            return Array(repeating: .initial, count: clamped)
+        }
+        return (0..<clamped).map { index in
+            guard index < raw.count, let layout = Layout(rawValue: raw[index]) else {
+                return .initial
+            }
+            return layout
+        }
+    }
+
+    package static func save(displayID: CGDirectDisplayID, layouts: [Layout]) {
+        UserDefaults.standard.set(layouts.map(\.rawValue), forKey: key(displayID))
+    }
+
+    private static func key(_ displayID: CGDirectDisplayID) -> String {
+        "\(keyPrefix)\(displayID)"
+    }
 }
 
 package enum Tiler {

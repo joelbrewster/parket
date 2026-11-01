@@ -108,10 +108,7 @@ package final class WorkspaceManager {
         }
         let target = placementTarget(for: window.pid)
         let monitor = monitors.indices.contains(target.monitorIndex) ? monitors[target.monitorIndex] : focusedMonitor
-        let rule = Config.shared.rule(for: window.pid)
-        if rule?.float == true {
-            monitor.setFloating(window, true)
-        }
+        applyFloatPolicy(to: window, on: monitor)
         let result = monitor.addWindow(window, workspaceIndex: target.workspaceIndex)
         if result == .inserted {
             refreshWindowRegistry(pid: window.pid)
@@ -744,15 +741,24 @@ package final class WorkspaceManager {
     ) {
         let monitor = monitorForWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID)
         let rule = Config.shared.rule(for: window.pid)
-        if rule?.float == true {
-            monitor.setFloating(window, true)
-        }
+        applyFloatPolicy(to: window, on: monitor)
         let workspace = ExistingWindowPlacement.workspaceIndex(
             rule: rule?.workspaceIndex,
             count: monitor.workspaces.count,
             fallback: monitor.active
         )
         _ = monitor.addWindow(window, workspaceIndex: workspace)
+    }
+
+    private func applyFloatPolicy(to window: TrackedWindow, on monitor: Monitor) {
+        if Config.shared.rule(for: window.pid)?.float == true {
+            monitor.setFloating(window, true)
+            return
+        }
+        guard let frame = window.getFrame() else { return }
+        if AutoFloatPolicy.shouldFloat(frame: frame, screen: monitor.tileFrame, title: window.title()) {
+            monitor.setFloating(window, true)
+        }
     }
 
     private func revealFocusedExistingWindow() {

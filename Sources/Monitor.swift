@@ -42,6 +42,8 @@ package final class Monitor {
         self.screen = screen
         self.tileFrame = tileFrame
         self.offscreenContext = offscreenContext
+        self.layouts = WorkspaceLayoutStore.load(
+            displayID: displayID, count: Config.shared.workspaceCount)
     }
 
     func switchTo(_ index: Int) {
@@ -299,6 +301,7 @@ package final class Monitor {
     func toggleLayout() {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
         layouts[active] = layouts[active] == .tile ? .monocle : .tile
+        persistLayouts()
         retile(validate: false)
         if layouts[active] == .monocle, let focused = WindowManager.focusedWindow(),
             workspaces[active].contains(focused)
@@ -618,6 +621,7 @@ package final class Monitor {
         focusedIndices = state.focusedIndices
         active = state.active
         previousActive = state.previousActive
+        persistLayouts()
     }
 
     func saveFocusedIndex() {
@@ -640,6 +644,7 @@ package final class Monitor {
         focusedIndices = source.focusedIndices
         active = source.active
         previousActive = source.previousActive
+        persistLayouts()
     }
 
     func swapState(with other: Monitor) {
@@ -656,6 +661,7 @@ package final class Monitor {
         other.focusedIndices = focusedIndices
         other.active = active
         other.previousActive = previousActive
+        other.persistLayouts()
     }
 
     func migratePrimaryState(from source: Monitor) {
@@ -679,6 +685,7 @@ package final class Monitor {
         focusedIndices = state.focusedIndices
         active = state.active
         previousActive = state.previousActive
+        persistLayouts()
     }
 
     func resetState() {
@@ -687,10 +694,14 @@ package final class Monitor {
         geometryOperationGeneration &+= 1
         let count = Config.shared.workspaceCount
         workspaces = Array(repeating: [], count: count)
-        layouts = Array(repeating: .initial, count: count)
+        layouts = WorkspaceLayoutStore.load(displayID: displayID, count: count)
         focusedIndices = Array(repeating: 0, count: count)
         active = 0
         previousActive = 0
+    }
+
+    private func persistLayouts() {
+        WorkspaceLayoutStore.save(displayID: displayID, layouts: layouts)
     }
 
     func restoreFocusedWindow(afterWorkspaceSwitch: Bool = false) {

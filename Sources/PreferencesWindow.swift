@@ -40,8 +40,8 @@ package final class PreferencesWindowController: NSWindowController {
 
     private init() {
         let window = NSPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 460, height: 520),
-            styleMask: [.titled, .closable],
+            contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
@@ -54,6 +54,7 @@ package final class PreferencesWindowController: NSWindowController {
         window.level = .floating
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
         window.isMovableByWindowBackground = true
+        window.contentMinSize = NSSize(width: 420, height: 280)
         super.init(window: window)
         buildContent()
     }
@@ -121,7 +122,9 @@ package final class PreferencesWindowController: NSWindowController {
             borderRadiusPopup, [0, 2, 4, 6, 8, 10, 12], suffix: " px", action: #selector(chooseBorderRadius(_:)))
         fillIntegers(workspaceCountPopup, Array(1...10), action: #selector(chooseWorkspaceCount(_:)))
         fillPercents(
-            masterRatioPopup, Array(stride(from: 30, through: 70, by: 5)), action: #selector(chooseMasterRatio(_:)))
+            masterRatioPopup,
+            [27.5, 30, 35, 40, 45, 50, 55, 60, 62.5, 65, 70],
+            action: #selector(chooseMasterRatio(_:)))
         fill(
             modifierPopup,
             [
@@ -133,37 +136,6 @@ package final class PreferencesWindowController: NSWindowController {
         terminalPopup.action = #selector(chooseTerminal(_:))
         terminalPopup.widthAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
         rebuildTerminalPopup()
-
-        let stack = NSStackView()
-        stack.orientation = .vertical
-        stack.alignment = .leading
-        stack.spacing = 16
-        stack.translatesAutoresizingMaskIntoConstraints = false
-
-        let appearance = grid([
-            row("Show Bar", barCheckbox),
-            row("Show Menu Bar Icon", menuBarIconCheckbox),
-            row("Bar Font", fontPopup),
-            row("Window Highlight", highlightPopup),
-            row("Tag Highlight", tagHighlightPopup),
-            row("Border Width", borderWidthPopup),
-            row("Border Radius", borderRadiusPopup),
-        ])
-        let tiling = grid([
-            row("Workspaces", workspaceCountPopup),
-            row("Master Width", masterRatioPopup),
-            row("Outside Space", outerGapPopup),
-            row("Window Gap", windowGapPopup),
-            row("Focus Follows Mouse", focusFollowsMouseCheckbox),
-        ])
-        let keys = grid([
-            row("Modifier", modifierPopup),
-            row("Hyper Keys", hyperCheckbox),
-            row("Letter Workspace Keys", letterKeysCheckbox),
-        ])
-        let terminal = grid([
-            row("App", terminalPopup)
-        ])
 
         fill(
             overlayModePopup,
@@ -185,21 +157,43 @@ package final class PreferencesWindowController: NSWindowController {
         overlayButtons.orientation = .horizontal
         overlayButtons.spacing = 8
         overlayButtons.alignment = .centerY
-        let desktop = grid([
+
+        let appearance = page(grid([
+            row("Show Bar", barCheckbox),
+            row("Show Menu Bar Icon", menuBarIconCheckbox),
+            row("Bar Font", fontPopup),
+            row("Window Highlight", highlightPopup),
+            row("Tag Highlight", tagHighlightPopup),
+            row("Border Width", borderWidthPopup),
+            row("Border Radius", borderRadiusPopup),
+        ]))
+        let desktop = page(grid([
             row("Image", overlayPathLabel),
             row("", overlayButtons),
             row("Placement", overlayModePopup),
-        ])
+        ]))
+        let tiling = page(grid([
+            row("Workspaces", workspaceCountPopup),
+            row("Master Width", masterRatioPopup),
+            row("Outside Space", outerGapPopup),
+            row("Window Gap", windowGapPopup),
+            row("Focus Follows Mouse", focusFollowsMouseCheckbox),
+        ]))
+        let keys = page(grid([
+            row("Modifier", modifierPopup),
+            row("Hyper Keys", hyperCheckbox),
+            row("Letter Workspace Keys", letterKeysCheckbox),
+            row("Terminal", terminalPopup),
+        ]))
 
         let configNote = Self.label(
-            "Keymaps, rules, and custom binds stay in ~/.config/parket/config.toml",
+            "Keymaps, workspace rules, and custom binds stay in ~/.config/parket/config.toml. Small windows and Picture in Picture float automatically.",
             style: .callout,
             color: .secondaryLabelColor
         )
-        configNote.preferredMaxLayoutWidth = 400
+        configNote.preferredMaxLayoutWidth = 420
         configNote.lineBreakMode = .byWordWrapping
         configNote.maximumNumberOfLines = 0
-
         let openConfig = NSButton(title: "Open Config", target: self, action: #selector(openConfig))
         openConfig.bezelStyle = .rounded
         let reloadConfig = NSButton(title: "Reload Config", target: self, action: #selector(reloadConfig))
@@ -208,49 +202,64 @@ package final class PreferencesWindowController: NSWindowController {
         buttons.orientation = .horizontal
         buttons.spacing = 12
         buttons.alignment = .centerY
+        let configBody = NSStackView(views: [configNote, buttons])
+        configBody.orientation = .vertical
+        configBody.alignment = .leading
+        configBody.spacing = 12
+        configBody.translatesAutoresizingMaskIntoConstraints = false
+        let config = page(configBody)
 
-        for view in [
-            Self.header("Appearance"), appearance,
-            Self.header("Desktop"), desktop,
-            Self.header("Tiling"), tiling,
-            Self.header("Keys"), keys,
-            Self.header("Terminal"), terminal,
-            configNote, buttons,
+        let tabs = NSTabView()
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        tabs.tabViewType = .topTabsBezelBorder
+        for (title, view) in [
+            ("Appearance", appearance),
+            ("Desktop", desktop),
+            ("Tiling", tiling),
+            ("Keys", keys),
+            ("Config", config),
         ] {
-            stack.addArrangedSubview(view)
+            let item = NSTabViewItem(identifier: title)
+            item.label = title
+            item.view = view
+            tabs.addTabViewItem(item)
         }
-        stack.setCustomSpacing(6, after: stack.arrangedSubviews[0])
-        stack.setCustomSpacing(6, after: stack.arrangedSubviews[2])
-        stack.setCustomSpacing(6, after: stack.arrangedSubviews[4])
-        stack.setCustomSpacing(6, after: stack.arrangedSubviews[6])
-        stack.setCustomSpacing(6, after: stack.arrangedSubviews[8])
-        stack.setCustomSpacing(8, after: configNote)
 
         let root = NSView()
-        root.translatesAutoresizingMaskIntoConstraints = false
-        root.addSubview(stack)
         window?.contentView = root
+        tabs.translatesAutoresizingMaskIntoConstraints = false
+        root.addSubview(tabs)
         NSLayoutConstraint.activate([
-            stack.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 22),
-            stack.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -22),
-            stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 18),
-            stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
-            appearance.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            desktop.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            tiling.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            keys.widthAnchor.constraint(equalTo: stack.widthAnchor),
-            terminal.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            tabs.leadingAnchor.constraint(equalTo: root.leadingAnchor, constant: 12),
+            tabs.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -12),
+            tabs.topAnchor.constraint(equalTo: root.topAnchor, constant: 10),
+            tabs.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -12),
             overlayPathLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 220),
         ])
-        sizeToFit()
         sync()
     }
 
-    private func sizeToFit() {
-        guard let window, let content = window.contentView else { return }
-        content.layoutSubtreeIfNeeded()
-        let size = content.fittingSize
-        window.setContentSize(NSSize(width: 460, height: max(size.height, 200)))
+    private func page(_ content: NSView, fill: Bool = false) -> NSView {
+        let wrap = NSView()
+        wrap.translatesAutoresizingMaskIntoConstraints = false
+        content.translatesAutoresizingMaskIntoConstraints = false
+        wrap.addSubview(content)
+        var constraints = [
+            content.leadingAnchor.constraint(equalTo: wrap.leadingAnchor, constant: 16),
+            content.trailingAnchor.constraint(equalTo: wrap.trailingAnchor, constant: -16),
+            content.topAnchor.constraint(equalTo: wrap.topAnchor, constant: 16),
+            content.widthAnchor.constraint(equalTo: wrap.widthAnchor, constant: -32),
+        ]
+        if fill {
+            constraints.append(
+                content.bottomAnchor.constraint(equalTo: wrap.bottomAnchor, constant: -16))
+        } else {
+            constraints.append(
+                content.bottomAnchor.constraint(
+                    lessThanOrEqualTo: wrap.bottomAnchor, constant: -16))
+        }
+        NSLayoutConstraint.activate(constraints)
+        return wrap
     }
 
     private func bind(_ checkbox: NSButton, _ action: Selector) {
@@ -301,11 +310,15 @@ package final class PreferencesWindowController: NSWindowController {
         popup.widthAnchor.constraint(greaterThanOrEqualToConstant: 160).isActive = true
     }
 
-    private func fillPercents(_ popup: NSPopUpButton, _ values: [Int], action: Selector) {
+    private func fillPercents(_ popup: NSPopUpButton, _ values: [Double], action: Selector) {
         popup.removeAllItems()
         for value in values {
-            popup.addItem(withTitle: "\(value)%")
-            popup.lastItem?.representedObject = Double(value) / 100
+            let title =
+                value.rounded() == value
+                ? "\(Int(value))%"
+                : String(format: "%.1f%%", value)
+            popup.addItem(withTitle: title)
+            popup.lastItem?.representedObject = value / 100
         }
         popup.target = self
         popup.action = action
@@ -551,10 +564,6 @@ package final class PreferencesWindowController: NSWindowController {
 
     private func number(from popup: NSPopUpButton) -> CGFloat? {
         (popup.selectedItem?.representedObject as? Double).map { CGFloat($0) }
-    }
-
-    private static func header(_ text: String) -> NSTextField {
-        label(text, style: .headline, color: .labelColor)
     }
 
     private static func label(_ text: String, style: NSFont.TextStyle, color: NSColor) -> NSTextField {

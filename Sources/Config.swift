@@ -737,6 +737,42 @@ package struct Config {
     }
 
     @MainActor
+    package static func setRules(_ rules: [AppRule]) {
+        let cleaned = rules.compactMap { rule -> AppRule? in
+            let name = rule.app.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !name.isEmpty else { return nil }
+            var workspace = rule.workspace
+            if let value = workspace, !WorkspaceBounds.isValidIndex(value - 1, count: shared.workspaceCount) {
+                workspace = nil
+            }
+            guard workspace != nil || rule.float else { return nil }
+            return AppRule(app: name, workspace: workspace, float: rule.float)
+        }
+        shared.rules = cleaned
+        writeRules()
+        StatusBar.shared.refresh()
+    }
+
+    package static func encodeRules(_ rules: [AppRule]) -> String {
+        rules.map { rule in
+            var lines = ["[[rules]]", "app = \"\(escapeTomlString(rule.app))\""]
+            if let workspace = rule.workspace {
+                lines.append("workspace = \(workspace)")
+            }
+            if rule.float {
+                lines.append("float = true")
+            }
+            return lines.joined(separator: "\n")
+        }.joined(separator: "\n\n")
+    }
+
+    package static func escapeTomlString(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+
+    @MainActor
     package static func adjustMasterRatio(_ delta: CGFloat) {
         let stepped = ((shared.masterRatio + delta) * 100).rounded() / 100
         let next = min(max(stepped, minMasterRatio), maxMasterRatio)
@@ -949,6 +985,23 @@ package struct Config {
         try? text.write(to: url, atomically: true, encoding: .utf8)
     }
 
+    @MainActor
+    private static func writeRules() {
+        let manager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        if !manager.fileExists(atPath: directory.path) {
+            try? manager.createDirectory(at: directory, withIntermediateDirectories: true)
+        }
+        var text = (try? String(contentsOf: url, encoding: .utf8)) ?? defaultConfigText
+        text = stripArrayOfTables(text, named: "rules")
+        let encoded = encodeRules(shared.rules)
+        if !encoded.isEmpty {
+            if !text.hasSuffix("\n") { text += "\n" }
+            text += "\n" + encoded + "\n"
+        }
+        try? text.write(to: url, atomically: true, encoding: .utf8)
+    }
+
     private static func stripSection(_ text: String, named name: String) -> String {
         var result: [String] = []
         var skipping = false
@@ -956,6 +1009,27 @@ package struct Config {
             let header = line.prefix(while: { $0 != "#" }).trimmingCharacters(in: .whitespaces)
             if header.hasPrefix("["), header.hasSuffix("]") {
                 skipping = header == "[\(name)]"
+            }
+            if skipping { continue }
+            result.append(String(line))
+        }
+        while result.last?.trimmingCharacters(in: .whitespaces).isEmpty == true {
+            result.removeLast()
+        }
+        return result.joined(separator: "\n")
+    }
+
+    package static func stripArrayOfTables(_ text: String, named name: String) -> String {
+        var result: [String] = []
+        var skipping = false
+        let marker = "[[\(name)]]"
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let header = line.prefix(while: { $0 != "#" }).trimmingCharacters(in: .whitespaces)
+            if header.hasPrefix("[["), header.hasSuffix("]]") {
+                skipping = header == marker
+                if skipping { continue }
+            } else if header.hasPrefix("["), header.hasSuffix("]") {
+                skipping = false
             }
             if skipping { continue }
             result.append(String(line))

@@ -49,8 +49,9 @@ private enum BatteryInfo {
         guard let sources = IOPSCopyPowerSourcesList(blob)?.takeRetainedValue() as? [CFTypeRef]
         else { return nil }
         for source in sources {
-            guard let desc = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue()
-                as? [String: Any]
+            guard
+                let desc = IOPSGetPowerSourceDescription(blob, source)?.takeUnretainedValue()
+                    as? [String: Any]
             else { continue }
             guard string(desc, kIOPSTypeKey) == kIOPSInternalBatteryType else { continue }
             let capacity = number(desc, kIOPSCurrentCapacityKey)

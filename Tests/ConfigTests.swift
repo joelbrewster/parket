@@ -233,4 +233,37 @@ struct ConfigTests {
         #expect(rule.matches(name: nil, bundle: "Safari", executable: nil))
         #expect(!rule.matches(name: "Mail", bundle: "com.apple.mail", executable: "Mail"))
     }
+
+    @Test func encodeRulesRoundTripsThroughParse() throws {
+        let rules = [
+            AppRule(app: "Finder", workspace: nil, float: true),
+            AppRule(app: "Safari", workspace: 2, float: false),
+            AppRule(app: "com.apple.calculator", workspace: 3, float: true),
+        ]
+        let encoded = Config.encodeRules(rules)
+        let config = try #require(Config.parse(encoded))
+        #expect(config.rules == rules)
+    }
+
+    @Test func stripArrayOfTablesRemovesRulesBlocks() {
+        let text = """
+            bar = true
+
+            [[rules]]
+            app = "Finder"
+            float = true
+
+            [bindings]
+            focus_next = "j"
+
+            [[rules]]
+            app = "Safari"
+            workspace = 2
+            """
+        let stripped = Config.stripArrayOfTables(text, named: "rules")
+        #expect(!stripped.contains("[[rules]]"))
+        #expect(stripped.contains("bar = true"))
+        #expect(stripped.contains("[bindings]"))
+        #expect(stripped.contains("focus_next = \"j\""))
+    }
 }

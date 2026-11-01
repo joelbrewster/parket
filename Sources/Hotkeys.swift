@@ -242,23 +242,23 @@ package final class Hotkeys {
     }
 
     private static func optionDown(_ flags: CGEventFlags) -> Bool {
-        flags.contains(.maskAlternate) || flags.contains(.init(rawValue: 0x00000020))
-            || flags.contains(.init(rawValue: 0x00000040))
+        flags.contains(.maskAlternate) || flags.contains(.init(rawValue: 0x0000_0020))
+            || flags.contains(.init(rawValue: 0x0000_0040))
     }
 
     private static func controlDown(_ flags: CGEventFlags) -> Bool {
-        flags.contains(.maskControl) || flags.contains(.init(rawValue: 0x00000001))
-            || flags.contains(.init(rawValue: 0x00002000))
+        flags.contains(.maskControl) || flags.contains(.init(rawValue: 0x0000_0001))
+            || flags.contains(.init(rawValue: 0x0000_2000))
     }
 
     private static func commandDown(_ flags: CGEventFlags) -> Bool {
-        flags.contains(.maskCommand) || flags.contains(.init(rawValue: 0x00000008))
-            || flags.contains(.init(rawValue: 0x00000010))
+        flags.contains(.maskCommand) || flags.contains(.init(rawValue: 0x0000_0008))
+            || flags.contains(.init(rawValue: 0x0000_0010))
     }
 
     private static func shiftDown(_ flags: CGEventFlags) -> Bool {
-        flags.contains(.maskShift) || flags.contains(.init(rawValue: 0x00000002))
-            || flags.contains(.init(rawValue: 0x00000004))
+        flags.contains(.maskShift) || flags.contains(.init(rawValue: 0x0000_0002))
+            || flags.contains(.init(rawValue: 0x0000_0004))
     }
 
     private static func binding(for chord: HotkeyChord) -> HotkeyAction? {

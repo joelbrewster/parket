@@ -10,12 +10,13 @@ struct FocusBorderLayoutTests {
         let window = FocusBorderLayout.windowFrame(from: tile)
         let inset = FocusBorderLayout.width
         #expect(
-            window == CGRect(
-                x: tile.minX + inset,
-                y: tile.minY + inset,
-                width: tile.width - inset * 2,
-                height: tile.height - inset * 2
-            )
+            window
+                == CGRect(
+                    x: tile.minX + inset,
+                    y: tile.minY + inset,
+                    width: tile.width - inset * 2,
+                    height: tile.height - inset * 2
+                )
         )
     }
 }
