@@ -74,7 +74,8 @@ enum MenuBarChrome {
         ]
         var best: (Double, NSColor)?
         for swatch in swatches {
-            let distance = (r - swatch.0) * (r - swatch.0)
+            let distance =
+                (r - swatch.0) * (r - swatch.0)
                 + (g - swatch.1) * (g - swatch.1)
                 + (b - swatch.2) * (b - swatch.2)
             if best == nil || distance < best!.0 {
@@ -191,6 +192,8 @@ package final class DesktopBackground {
         }
         Bar.shared.applyAppearance()
         FocusBorder.shared.applyAppearance()
+        DesktopOverlay.shared.applyAppearance()
+        DesktopOverlay.shared.sync(screens: NSScreen.screens)
         guard let url = writeImage(MenuBarChrome.color) else { return }
         let options: [NSWorkspace.DesktopImageOptionKey: Any] = [
             .allowClipping: true,

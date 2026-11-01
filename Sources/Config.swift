@@ -220,6 +220,8 @@ package struct Config {
     package var borderWidth: CGFloat = 2
     package var borderRadius: CGFloat = 6
     package var terminal = "Ghostty"
+    package var desktopOverlay = ""
+    package var desktopOverlayMode: DesktopOverlayMode = .center
     package var workspaceNames: [Int: String] = [:]
     package var customBindings: [Binding] = []
     package var rules: [AppRule] = []
@@ -593,6 +595,22 @@ package struct Config {
     }
 
     @MainActor
+    package static func setDesktopOverlay(_ value: String) {
+        shared.desktopOverlay = value
+        defaults.set(value, forKey: uiDesktopOverlayKey)
+        DesktopOverlay.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
+    package static func setDesktopOverlayMode(_ value: DesktopOverlayMode) {
+        shared.desktopOverlayMode = value
+        defaults.set(value.rawValue, forKey: uiDesktopOverlayModeKey)
+        DesktopOverlay.shared.reload()
+        StatusBar.shared.refresh()
+    }
+
+    @MainActor
     package static func applyUIPreferences() {
         if let value = bool(uiBarKey) { shared.bar = value }
         if let value = bool(uiMenuBarIconKey) { shared.menuBarIcon = value }
@@ -638,6 +656,19 @@ package struct Config {
         if defaults.object(forKey: uiTerminalKey) != nil {
             shared.terminal = defaults.string(forKey: uiTerminalKey) ?? ""
         }
+        if defaults.object(forKey: uiDesktopOverlayKey) != nil {
+            shared.desktopOverlay = defaults.string(forKey: uiDesktopOverlayKey) ?? ""
+        }
+        if let raw = defaults.string(forKey: uiDesktopOverlayModeKey) {
+            switch raw {
+            case DesktopOverlayMode.tile.rawValue:
+                shared.desktopOverlayMode = .tile
+            case DesktopOverlayMode.fill.rawValue:
+                shared.desktopOverlayMode = .fill
+            default:
+                shared.desktopOverlayMode = .center
+            }
+        }
     }
 
     private static var defaults: UserDefaults { UserDefaults.standard }
@@ -657,6 +688,8 @@ package struct Config {
     private static let uiLetterKeysKey = "parket.letterKeys"
     private static let uiFocusFollowsMouseKey = "parket.focusFollowsMouse"
     private static let uiTerminalKey = "parket.terminal"
+    private static let uiDesktopOverlayKey = "parket.desktopOverlay"
+    private static let uiDesktopOverlayModeKey = "parket.desktopOverlayMode"
 
     private static func bool(_ key: String) -> Bool? {
         defaults.object(forKey: key) == nil ? nil : defaults.bool(forKey: key)

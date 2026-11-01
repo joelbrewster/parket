@@ -32,6 +32,10 @@ package final class PreferencesWindowController: NSWindowController {
     private let masterRatioPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let modifierPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let terminalPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let overlayModePopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    private let overlayPathLabel = NSTextField(labelWithString: "None")
+    private let chooseOverlayButton = NSButton(title: "Choose...", target: nil, action: nil)
+    private let clearOverlayButton = NSButton(title: "Clear", target: nil, action: nil)
 
     private init() {
         let window = NSPanel(
@@ -90,6 +94,7 @@ package final class PreferencesWindowController: NSWindowController {
         select(masterRatioPopup, number: config.masterRatio)
         select(modifierPopup, string: config.modifier.rawValue)
         selectTerminal()
+        syncOverlay()
     }
 
     private func buildContent() {
@@ -156,6 +161,32 @@ package final class PreferencesWindowController: NSWindowController {
             row("App", terminalPopup)
         ])
 
+        fill(
+            overlayModePopup,
+            [
+                ("Center", DesktopOverlayMode.center.rawValue),
+                ("Tile", DesktopOverlayMode.tile.rawValue),
+                ("Fill", DesktopOverlayMode.fill.rawValue),
+            ], action: #selector(chooseOverlayMode(_:)))
+        chooseOverlayButton.target = self
+        chooseOverlayButton.action = #selector(chooseOverlay)
+        chooseOverlayButton.bezelStyle = .rounded
+        clearOverlayButton.target = self
+        clearOverlayButton.action = #selector(clearOverlay)
+        clearOverlayButton.bezelStyle = .rounded
+        overlayPathLabel.lineBreakMode = .byTruncatingMiddle
+        overlayPathLabel.maximumNumberOfLines = 1
+        overlayPathLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        let overlayButtons = NSStackView(views: [chooseOverlayButton, clearOverlayButton])
+        overlayButtons.orientation = .horizontal
+        overlayButtons.spacing = 8
+        overlayButtons.alignment = .centerY
+        let desktop = grid([
+            row("Image", overlayPathLabel),
+            row("", overlayButtons),
+            row("Placement", overlayModePopup),
+        ])
+
         let configNote = Self.label(
             "Keymaps, rules, and custom binds stay in ~/.config/parket/config.toml",
             style: .callout,
@@ -176,6 +207,7 @@ package final class PreferencesWindowController: NSWindowController {
 
         for view in [
             Self.header("Appearance"), appearance,
+            Self.header("Desktop"), desktop,
             Self.header("Tiling"), tiling,
             Self.header("Keys"), keys,
             Self.header("Terminal"), terminal,
@@ -187,6 +219,7 @@ package final class PreferencesWindowController: NSWindowController {
         stack.setCustomSpacing(6, after: stack.arrangedSubviews[2])
         stack.setCustomSpacing(6, after: stack.arrangedSubviews[4])
         stack.setCustomSpacing(6, after: stack.arrangedSubviews[6])
+        stack.setCustomSpacing(6, after: stack.arrangedSubviews[8])
         stack.setCustomSpacing(8, after: configNote)
 
         let root = NSView()
@@ -199,9 +232,11 @@ package final class PreferencesWindowController: NSWindowController {
             stack.topAnchor.constraint(equalTo: root.topAnchor, constant: 18),
             stack.bottomAnchor.constraint(equalTo: root.bottomAnchor, constant: -18),
             appearance.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            desktop.widthAnchor.constraint(equalTo: stack.widthAnchor),
             tiling.widthAnchor.constraint(equalTo: stack.widthAnchor),
             keys.widthAnchor.constraint(equalTo: stack.widthAnchor),
             terminal.widthAnchor.constraint(equalTo: stack.widthAnchor),
+            overlayPathLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 220),
         ])
         sizeToFit()
         sync()
@@ -437,6 +472,51 @@ package final class PreferencesWindowController: NSWindowController {
             Config.setTerminal(url.deletingPathExtension().lastPathComponent)
             self.rebuildTerminalPopup()
             self.sync()
+        }
+    }
+
+    @objc private func chooseOverlay() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [.png]
+        panel.directoryURL = Config.url.deletingLastPathComponent()
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            Config.setDesktopOverlay(url.path)
+            self.syncOverlay()
+        }
+    }
+
+    @objc private func clearOverlay() {
+        Config.setDesktopOverlay("")
+        syncOverlay()
+    }
+
+    @objc private func chooseOverlayMode(_ sender: NSPopUpButton) {
+        guard !syncing, let raw = sender.selectedItem?.representedObject as? String else { return }
+        switch raw {
+        case DesktopOverlayMode.tile.rawValue:
+            Config.setDesktopOverlayMode(.tile)
+        case DesktopOverlayMode.fill.rawValue:
+            Config.setDesktopOverlayMode(.fill)
+        default:
+            Config.setDesktopOverlayMode(.center)
+        }
+    }
+
+    private func syncOverlay() {
+        select(overlayModePopup, string: Config.shared.desktopOverlayMode.rawValue)
+        let path = Config.shared.desktopOverlay
+        if path.isEmpty {
+            overlayPathLabel.stringValue = "None"
+            overlayPathLabel.toolTip = nil
+            clearOverlayButton.isEnabled = false
+        } else {
+            overlayPathLabel.stringValue = (path as NSString).lastPathComponent
+            overlayPathLabel.toolTip = path
+            clearOverlayButton.isEnabled = true
         }
     }
 

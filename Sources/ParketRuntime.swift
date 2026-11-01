@@ -149,6 +149,7 @@ package final class ParketRuntime {
         FocusBorder.shared.start()
         MouseFocus.shared.apply(enabled: Config.shared.focusFollowsMouse)
         DesktopBackground.shared.start()
+        DesktopOverlay.shared.start()
         isRunning = true
         fputs("parket: running\n", stderr)
     }

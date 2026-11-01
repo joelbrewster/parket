@@ -69,6 +69,7 @@ package final class Bar {
         Battery.shared.start()
         NowPlaying.shared.start()
         DesktopBackground.shared.start()
+        DesktopOverlay.shared.start()
         sync(screens: NSScreen.screens)
     }
 
