@@ -46,16 +46,18 @@ package final class MouseFocus {
 
     private func focusWindowUnderPointer() {
         guard NSEvent.pressedMouseButtons == 0, let point = CGEvent(source: nil)?.location else { return }
-        guard let tile = WorkspaceManager.shared.tiledWindow(at: point) else {
+        guard let target = WorkspaceManager.shared.tiledWindow(at: point) else {
             lastHovered = nil
             return
         }
-        guard tile != lastHovered else { return }
-        lastHovered = tile
-        guard let top = WindowManager.topWindow(at: point),
-            let target = WorkspaceManager.shared.visibleWindow(pid: top.pid, element: top.element),
-            WindowManager.focusedWindow() != target
-        else { return }
+        guard target != lastHovered else { return }
+        if let top = WindowManager.topWindow(at: point),
+            WorkspaceManager.shared.visibleWindow(pid: top.pid, element: top.element) == nil
+        {
+            return
+        }
+        lastHovered = target
+        guard WindowManager.focusedWindow() != target else { return }
         target.focus()
     }
 }

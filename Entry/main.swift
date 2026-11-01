@@ -17,6 +17,7 @@ final class TerminationCoordinator: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        WorkspaceManager.shared.saveSession()
         WorkspaceManager.shared.restoreAllWindows()
         return .terminateNow
     }

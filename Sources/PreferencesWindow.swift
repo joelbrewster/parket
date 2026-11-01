@@ -187,7 +187,7 @@ package final class PreferencesWindowController: NSWindowController {
         ]))
 
         let configNote = Self.label(
-            "Keymaps, workspace rules, and custom binds stay in ~/.config/parket/config.toml. Small windows and Picture in Picture float automatically.",
+            "Keymaps and custom binds stay in ~/.config/parket/config.toml. Workspace and float positions are remembered automatically.",
             style: .callout,
             color: .secondaryLabelColor
         )

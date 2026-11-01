@@ -78,12 +78,8 @@
 # key = "shift+space"
 # command = "open -n -a Safari"
 
-# workspace placement by app name or bundle id (1-10)
+# optional workspace/float hints (session memory usually replaces these)
 # small windows and Picture in Picture float automatically
 # [[rules]]
 # app = "Safari"
 # workspace = 2
-#
-# [[rules]]
-# app = "Finder"
-# float = true

@@ -47,6 +47,7 @@ package final class WorkspaceManager {
         rebuildMonitors(screens: screens, snapshot: snapshot)
         focusedMonitorIndex = 0
         lastPrimaryDisplayID = primaryDisplayID()
+        WindowSessionStore.shared.beginRestore()
         let windows = PerformanceTelemetry.measure(.axSnapshot) {
             WindowManager.allWindows()
         }
@@ -54,6 +55,14 @@ package final class WorkspaceManager {
         for window in windows {
             placeExistingWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID)
         }
+        for monitor in monitors {
+            if let workspace = WindowSessionStore.shared.activeWorkspace(
+                displayID: monitor.displayID, count: monitor.workspaces.count)
+            {
+                monitor.active = workspace
+            }
+        }
+        WindowSessionStore.shared.endRestore()
         revealFocusedExistingWindow()
         if !isTilingPaused {
             for monitor in monitors {
@@ -62,13 +71,19 @@ package final class WorkspaceManager {
             }
         }
         refreshWindowRegistry()
+        WindowSessionStore.shared.saveNow(from: monitors)
         StatusBar.shared.update()
+    }
+
+    package func saveSession() {
+        WindowSessionStore.shared.saveNow(from: monitors)
     }
 
     func switchTo(_ index: Int) {
         guard !isTilingPaused else { return }
         guard !monitors.isEmpty else { return }
         focusedMonitor.switchTo(index)
+        scheduleSessionSave()
         scheduleStatusUpdate()
     }
 
@@ -90,6 +105,7 @@ package final class WorkspaceManager {
         guard !monitors.isEmpty else { return }
         if let moved = focusedMonitor.moveActiveWindowTo(index) {
             refreshWindowRegistry(pid: moved.pid)
+            scheduleSessionSave()
         }
         StatusBar.shared.update()
     }
@@ -112,6 +128,7 @@ package final class WorkspaceManager {
         let result = monitor.addWindow(window, workspaceIndex: target.workspaceIndex)
         if result == .inserted {
             refreshWindowRegistry(pid: window.pid)
+            scheduleSessionSave()
             StatusBar.shared.update()
         }
         if result == .replaced {
@@ -245,6 +262,7 @@ package final class WorkspaceManager {
         guard !isTilingPaused else { return }
         guard !monitors.isEmpty else { return }
         focusedMonitor.toggleFloating()
+        scheduleSessionSave()
         StatusBar.shared.update()
     }
 
@@ -296,6 +314,7 @@ package final class WorkspaceManager {
 
         focusedMonitorIndex = targetIndex
         refreshWindowRegistry(pid: moved.pid)
+        scheduleSessionSave()
         moved.focus()
         StatusBar.shared.update()
     }
@@ -506,7 +525,9 @@ package final class WorkspaceManager {
                         target.adoptWindowFromRemovedMonitor(
                             window,
                             sourceWorkspaceIndex: workspaceIndex,
-                            sourceActive: oldMonitor.active
+                            sourceActive: oldMonitor.active,
+                            wasFloating: oldMonitor.isFloating(window),
+                            floatingFrame: oldMonitor.floatingFrame(for: window)
                         )
                     }
                 }
@@ -740,6 +761,26 @@ package final class WorkspaceManager {
         fallbackDisplayID: CGDirectDisplayID?
     ) {
         let monitor = monitorForWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID)
+        if let record = WindowSessionStore.shared.take(
+            pid: window.pid,
+            title: window.title(),
+            displayID: monitor.displayID,
+            workspaceCount: monitor.workspaces.count
+        ) {
+            if record.floating {
+                monitor.setFloating(window, true)
+                if let frame = record.frame {
+                    monitor.restoreFloatingFrame(window, frame)
+                }
+            }
+            let workspace = ExistingWindowPlacement.workspaceIndex(
+                rule: record.workspace,
+                count: monitor.workspaces.count,
+                fallback: monitor.active
+            )
+            _ = monitor.addWindow(window, workspaceIndex: workspace)
+            return
+        }
         let rule = Config.shared.rule(for: window.pid)
         applyFloatPolicy(to: window, on: monitor)
         let workspace = ExistingWindowPlacement.workspaceIndex(
@@ -759,6 +800,10 @@ package final class WorkspaceManager {
         if AutoFloatPolicy.shouldFloat(frame: frame, screen: monitor.tileFrame, title: window.title()) {
             monitor.setFloating(window, true)
         }
+    }
+
+    private func scheduleSessionSave() {
+        WindowSessionStore.shared.scheduleSave(from: monitors)
     }
 
     private func revealFocusedExistingWindow() {

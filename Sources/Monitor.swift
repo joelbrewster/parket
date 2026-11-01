@@ -137,7 +137,11 @@ package final class Monitor {
         }
         let tiled = windows.filter { !isFloating($0) }
         if layouts[active] == .monocle {
-            return tiled.indices.contains(focusedIndices[active]) ? tiled[focusedIndices[active]] : tiled.first
+            if windows.indices.contains(focusedIndices[active]) {
+                let focused = windows[focusedIndices[active]]
+                if !isFloating(focused) { return focused }
+            }
+            return tiled.first
         }
         let frames = Tiler.calculateFrames(
             count: tiled.count,
@@ -179,7 +183,9 @@ package final class Monitor {
     func adoptWindowFromRemovedMonitor(
         _ window: TrackedWindow,
         sourceWorkspaceIndex: Int,
-        sourceActive: Int
+        sourceActive: Int,
+        wasFloating: Bool = false,
+        floatingFrame: CGRect? = nil
     ) {
         let target = RemovedMonitorWindowMigration.targetWorkspace(
             sourceWorkspaceIndex: sourceWorkspaceIndex,
@@ -189,10 +195,25 @@ package final class Monitor {
         )
         guard updateExistingWindow(window) == .missing else { return }
         workspaces[target].insert(window, at: 0)
+        if wasFloating {
+            floating.insert(window.group)
+            if let floatingFrame {
+                floatingFrames[window.group] = floatingFrame
+            }
+        }
         if target != active, !WorkspaceManager.shared.isTilingPaused {
             hideOffscreen(window)
             WindowManager.invalidateAppliedGeometry(window)
         }
+    }
+
+    func floatingFrame(for window: TrackedWindow) -> CGRect? {
+        floatingFrames[window.group]
+    }
+
+    func restoreFloatingFrame(_ window: TrackedWindow, _ frame: CGRect) {
+        guard isFloating(window) else { return }
+        floatingFrames[window.group] = frame
     }
 
     func updateExistingWindow(_ window: TrackedWindow) -> WindowUpdate {
@@ -288,14 +309,17 @@ package final class Monitor {
 
     func swapMaster() {
         guard !WorkspaceManager.shared.isTilingPaused else { return }
-        guard workspaces[active].count > 1 else { return }
+        let tiled = workspaces[active].filter { !isFloating($0) }
+        guard tiled.count > 1 else { return }
         guard let focused = WindowManager.focusedWindow(),
-            let i = workspaces[active].firstIndex(of: focused),
-            i != 0
+            !isFloating(focused),
+            let focusIndex = workspaces[active].firstIndex(of: focused),
+            let masterIndex = workspaces[active].firstIndex(of: tiled[0]),
+            focusIndex != masterIndex
         else { return }
-        workspaces[active].swapAt(0, i)
+        workspaces[active].swapAt(masterIndex, focusIndex)
         retile(validate: false)
-        workspaces[active][0].focus()
+        workspaces[active][masterIndex].focus()
     }
 
     func toggleLayout() {
@@ -303,10 +327,13 @@ package final class Monitor {
         layouts[active] = layouts[active] == .tile ? .monocle : .tile
         persistLayouts()
         retile(validate: false)
-        if layouts[active] == .monocle, let focused = WindowManager.focusedWindow(),
-            workspaces[active].contains(focused)
-        {
-            focused.raise()
+        if layouts[active] == .monocle {
+            let tiled = workspaces[active].filter { !isFloating($0) }
+            if let focused = WindowManager.focusedWindow(), tiled.contains(focused) {
+                focused.raise()
+            } else if let first = tiled.first {
+                first.raise()
+            }
         }
     }
 
@@ -644,6 +671,8 @@ package final class Monitor {
         focusedIndices = source.focusedIndices
         active = source.active
         previousActive = source.previousActive
+        floating = source.floating
+        floatingFrames = source.floatingFrames
         persistLayouts()
     }
 
@@ -653,6 +682,8 @@ package final class Monitor {
         let focusedIndices = focusedIndices
         let active = active
         let previousActive = previousActive
+        let floating = floating
+        let floatingFrames = floatingFrames
 
         copyState(from: other)
 
@@ -661,10 +692,14 @@ package final class Monitor {
         other.focusedIndices = focusedIndices
         other.active = active
         other.previousActive = previousActive
+        other.floating = floating
+        other.floatingFrames = floatingFrames
         other.persistLayouts()
     }
 
     func migratePrimaryState(from source: Monitor) {
+        let survivingFloating = floating
+        let survivingFrames = floatingFrames
         var state = MonitorWorkspaceState(
             workspaces: workspaces,
             layouts: layouts,
@@ -685,6 +720,17 @@ package final class Monitor {
         focusedIndices = state.focusedIndices
         active = state.active
         previousActive = state.previousActive
+        floating = source.floating
+        floatingFrames = source.floatingFrames
+        let groups = Set(workspaces.flatMap { $0.map(\.group) })
+        for key in survivingFloating where groups.contains(key) {
+            floating.insert(key)
+            if let frame = survivingFrames[key] {
+                floatingFrames[key] = frame
+            }
+        }
+        floating = floating.intersection(groups)
+        floatingFrames = floatingFrames.filter { groups.contains($0.key) }
         persistLayouts()
     }
 
@@ -696,6 +742,8 @@ package final class Monitor {
         workspaces = Array(repeating: [], count: count)
         layouts = WorkspaceLayoutStore.load(displayID: displayID, count: count)
         focusedIndices = Array(repeating: 0, count: count)
+        floating = []
+        floatingFrames = [:]
         active = 0
         previousActive = 0
     }

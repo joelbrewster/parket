@@ -51,7 +51,7 @@ Homebrew is the normal install path. Release zips use ad-hoc signing.
 | `Option + ,` / `Option + .` | Focus previous or next monitor |
 | `Option + Shift + ,` / `Option + Shift + .` | Move window to previous or next monitor |
 
-Right-click the bar or menu extra and choose Settings for appearance, tiling, modifier, and terminal. Config is for keymaps, workspace rules, and custom binds. Small windows and Picture in Picture float automatically.
+Right-click the bar or menu extra and choose Settings for appearance, tiling, modifier, and terminal. Config is for keymaps and custom binds. Workspace and float positions are remembered across restarts. Small windows and Picture in Picture float automatically.
 
 Control+Option+Command is an alias for Option on every bind; add Shift for the move/spawn binds. Set `hyper = false` to turn that off.
 
@@ -67,13 +67,14 @@ Menubar commands: Pause Tiling, Retile Now, Pause and Restore Windows, Settings,
 - One native tab group counts as one tileable window.
 - Panels, dialogs, minimized windows, fullscreen windows, and dead AX elements stay out of workspace state.
 - Small windows and Picture in Picture float automatically.
+- Workspace and float positions persist across restarts.
 - Recovery actions bring tracked windows back onscreen.
 
 ## Configuration
 
 Edit `~/.config/parket/config.toml`. All fields are optional.
 
-Appearance, tiling, modifier, and terminal live in Settings. `config.toml` is for keymaps, workspace rules, and custom binds. UI keys in the file apply until you change them in Settings.
+Appearance, tiling, modifier, and terminal live in Settings. `config.toml` is for keymaps and custom binds. UI keys in the file apply until you change them in Settings. Window workspace and float state are saved to `~/.config/parket/session.json` and restored on launch.
 
 ```toml
 workspace_count = 10

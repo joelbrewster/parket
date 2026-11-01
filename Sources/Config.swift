@@ -670,7 +670,12 @@ package struct Config {
         }
         if let value = bool(uiHyperKey) { shared.hyper = value }
         if let value = bool(uiLetterKeysKey) { shared.workspaceLetterKeys = value }
-        if let value = bool(uiFocusFollowsMouseKey) { shared.focusFollowsMouse = value }
+        if let value = bool(uiFocusFollowsMouseKey) {
+            shared.focusFollowsMouse = value
+        } else {
+            shared.focusFollowsMouse = true
+            defaults.set(true, forKey: uiFocusFollowsMouseKey)
+        }
         if defaults.object(forKey: uiTerminalKey) != nil {
             shared.terminal = defaults.string(forKey: uiTerminalKey) ?? ""
         }
