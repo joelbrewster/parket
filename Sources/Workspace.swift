@@ -52,11 +52,13 @@ package final class WorkspaceManager {
         }
         let fallbackDisplayID = lastPrimaryDisplayID
         for window in windows {
-            monitorForWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID).insertWindow(window)
+            placeExistingWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID)
         }
+        revealFocusedExistingWindow()
         if !isTilingPaused {
             for monitor in monitors {
-                monitor.retile(validate: false)
+                monitor.cancelPendingRetile()
+                monitor.applyScreenChangeGeometry()
             }
         }
         refreshWindowRegistry()
@@ -728,6 +730,38 @@ package final class WorkspaceManager {
 
     private func singleTrackedWindow(pid: pid_t) -> (window: TrackedWindow, location: WindowLocation)? {
         windowRegistry.singleTrackedWindow(pid: pid, in: monitors)
+    }
+
+    private func placeExistingWindow(
+        _ window: TrackedWindow,
+        snapshot: ScreenSnapshot,
+        fallbackDisplayID: CGDirectDisplayID?
+    ) {
+        let monitor = monitorForWindow(window, snapshot: snapshot, fallbackDisplayID: fallbackDisplayID)
+        let rule = Config.shared.rule(for: window.pid)
+        if rule?.float == true {
+            monitor.setFloating(window, true)
+        }
+        let workspace = ExistingWindowPlacement.workspaceIndex(
+            rule: rule?.workspaceIndex,
+            count: monitor.workspaces.count,
+            fallback: monitor.active
+        )
+        _ = monitor.addWindow(window, workspaceIndex: workspace)
+    }
+
+    private func revealFocusedExistingWindow() {
+        guard let focused = WindowManager.focusedWindow() else { return }
+        for (index, monitor) in monitors.enumerated() {
+            guard let workspace = monitor.workspaces.firstIndex(where: { $0.contains(focused) }) else { continue }
+            focusedMonitorIndex = index
+            if workspace != monitor.active {
+                monitor.previousActive = monitor.active
+                monitor.active = workspace
+            }
+            _ = monitor.rememberFocusedWindow(focused)
+            return
+        }
     }
 
     private func placementTarget(for pid: pid_t) -> WorkspacePlacementTarget {

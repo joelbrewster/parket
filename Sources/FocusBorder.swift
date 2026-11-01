@@ -35,8 +35,7 @@ package final class FocusBorder {
     package func start() {
         guard globalMonitor == nil else { return }
         let mask: NSEvent.EventTypeMask = [
-            .leftMouseDown, .leftMouseUp, .leftMouseDragged,
-            .rightMouseDown, .rightMouseUp,
+            .leftMouseDragged, .leftMouseUp,
         ]
         globalMonitor = NSEvent.addGlobalMonitorForEvents(matching: mask) { event in
             MainActor.assumeIsolated {
@@ -62,7 +61,7 @@ package final class FocusBorder {
     }
 
     package func update() {
-        if dragging || NSEvent.pressedMouseButtons != 0 {
+        if dragging {
             hide(animated: true)
             return
         }
@@ -70,7 +69,7 @@ package final class FocusBorder {
     }
 
     package func concealUntilSettled() {
-        if dragging || NSEvent.pressedMouseButtons != 0 {
+        if dragging {
             hide(animated: true)
             return
         }
@@ -85,12 +84,11 @@ package final class FocusBorder {
 
     private func handleMouse(_ event: NSEvent) {
         switch event.type {
-        case .leftMouseDown, .rightMouseDown:
-            beginDrag()
         case .leftMouseDragged:
             if dragging { return }
             beginDrag()
-        case .leftMouseUp, .rightMouseUp:
+        case .leftMouseUp:
+            guard dragging else { return }
             endDrag()
         default:
             break
@@ -128,7 +126,7 @@ package final class FocusBorder {
     }
 
     private func tryShow() {
-        if dragging || NSEvent.pressedMouseButtons != 0 {
+        if dragging {
             hide(animated: true)
             return
         }

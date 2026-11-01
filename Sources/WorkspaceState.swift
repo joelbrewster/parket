@@ -98,6 +98,13 @@ struct WorkspacePlacementTarget: Equatable, Hashable, Sendable {
     let workspaceIndex: Int
 }
 
+enum ExistingWindowPlacement {
+    static func workspaceIndex(rule: Int?, count: Int, fallback: Int) -> Int {
+        guard let rule, WorkspaceBounds.isValidIndex(rule, count: count) else { return fallback }
+        return rule
+    }
+}
+
 enum NewWindowPlacement {
     static func target(
         existingAppWindows: [WorkspacePlacementTarget],

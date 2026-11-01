@@ -32,6 +32,14 @@ struct WorkspaceStateTests {
         #expect(state.previousActive == 3)
     }
 
+    @Test func existingWindowUsesRuleWorkspaceWhenInRange() {
+        #expect(ExistingWindowPlacement.workspaceIndex(rule: 1, count: 10, fallback: 0) == 1)
+        #expect(ExistingWindowPlacement.workspaceIndex(rule: 0, count: 10, fallback: 3) == 0)
+        #expect(ExistingWindowPlacement.workspaceIndex(rule: nil, count: 10, fallback: 3) == 3)
+        #expect(ExistingWindowPlacement.workspaceIndex(rule: 10, count: 10, fallback: 3) == 3)
+        #expect(ExistingWindowPlacement.workspaceIndex(rule: -1, count: 10, fallback: 3) == 3)
+    }
+
     @Test func newWindowUsesSingleExistingAppWorkspaceOwner() {
         let owner = WorkspacePlacementTarget(monitorIndex: 1, workspaceIndex: 2)
         let current = WorkspacePlacementTarget(monitorIndex: 0, workspaceIndex: 0)
